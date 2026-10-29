@@ -19,8 +19,11 @@ import 'package:gitjournal/editors/note_title_editor.dart';
 import 'package:gitjournal/editors/undo_redo.dart';
 import 'package:gitjournal/editors/utils/disposable_change_notifier.dart';
 import 'package:gitjournal/error_reporting.dart';
+import 'package:gitjournal/folder_views/common.dart';
 import 'package:gitjournal/logger/logger.dart';
+import 'package:gitjournal/markdown/markdown_renderer.dart';
 import 'package:gitjournal/settings/app_config.dart';
+import 'package:gitjournal/utils/markdown.dart';
 import 'package:gitjournal/utils/utils.dart';
 import 'package:provider/provider.dart';
 
@@ -91,6 +94,26 @@ class MarkdownEditorState extends State<MarkdownEditor>
 
     _scrollController = ScrollController(keepScrollOffset: false);
     _undoRedoStack = UndoRedoStack();
+
+    _textController.addListener(_textControllerChanged);
+  }
+
+  // Rebuild to refresh the live preview when the text changes
+  void _textControllerChanged() {
+    if (!mounted) return;
+    if (AppConfig.instance.livePreview) {
+      setState(() {});
+    }
+  }
+
+  void _replaceTextController({String? highlightText, int currentPos = -1}) {
+    _textController = buildController(
+      text: _textController.text,
+      highlightText: highlightText,
+      theme: widget.theme,
+      currentPos: currentPos,
+    );
+    _textController.addListener(_textControllerChanged);
   }
 
   @override
@@ -119,7 +142,7 @@ class MarkdownEditorState extends State<MarkdownEditor>
 
   @override
   Widget build(BuildContext context) {
-    var editor = EditorScrollView(
+    Widget editor = EditorScrollView(
       scrollController: _scrollController,
       child: Column(
         children: <Widget>[
@@ -137,9 +160,30 @@ class MarkdownEditorState extends State<MarkdownEditor>
       ),
     );
 
-    var settings = context.watch<AppConfig>();
+    var appConfig = context.watch<AppConfig>();
+    if (appConfig.livePreview) {
+      // The preview renders the same text the editor is editing
+      var previewNote = _note.copyWith(body: _textController.text);
+      editor = Column(
+        children: <Widget>[
+          Expanded(child: editor),
+          const Divider(height: 1.0),
+          Expanded(
+            child: EditorScrollView(
+              child: MarkdownRenderer(
+                note: previewNote,
+                onNoteTapped: (note) =>
+                    openNoteEditor(context, note, _note.parent),
+                onImageResized: _onImageResized,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
     Widget? markdownToolbar;
-    if (settings.experimentalMarkdownToolbar) {
+    if (appConfig.experimentalMarkdownToolbar) {
       markdownToolbar = MarkdownToolBar(
         textController: _textController,
       );
@@ -157,6 +201,18 @@ class MarkdownEditorState extends State<MarkdownEditor>
       onRedoSelected: _redo,
       undoAllowed: _undoRedoStack.undoPossible,
       redoAllowed: _undoRedoStack.redoPossible,
+      extraButton: IconButton(
+        icon: Icon(
+          Icons.vertical_split,
+          color: appConfig.livePreview
+              ? Theme.of(context).colorScheme.secondary
+              : null,
+        ),
+        onPressed: () {
+          appConfig.livePreview = !appConfig.livePreview;
+          appConfig.save();
+        },
+      ),
       extraBottomWidget: markdownToolbar,
       findAllowed: true,
     );
@@ -239,6 +295,36 @@ class MarkdownEditorState extends State<MarkdownEditor>
   @override
   bool get noteModified => _noteModified;
 
+  // Writes the new image width back into the body by replacing exactly the
+  // markup of the resized image. Not tracked by the undo stack - resizing
+  // an image isn't undoable.
+  void _onImageResized(int start, int end, double width) {
+    var text = _textController.text;
+    if (start < 0 || end > text.length || start >= end) return;
+
+    var markup = text.substring(start, end);
+    var newMarkup = imageMarkupWithWidth(markup, width.round());
+    if (newMarkup == null) return;
+
+    int adjustOffset(int offset) {
+      if (offset <= start) return offset;
+      if (offset >= end) return offset + newMarkup.length - markup.length;
+      return start;
+    }
+
+    var selection = _textController.selection;
+    setState(() {
+      _textController.value = TextEditingValue(
+        text: text.replaceRange(start, end, newMarkup),
+        selection: TextSelection(
+          baseOffset: adjustOffset(selection.baseOffset),
+          extentOffset: adjustOffset(selection.extentOffset),
+        ),
+      );
+      _noteModified = true;
+    });
+  }
+
   Future<void> _undo() async {
     var es = _undoRedoStack.undo();
     setState(() {
@@ -256,11 +342,7 @@ class MarkdownEditorState extends State<MarkdownEditor>
   @override
   SearchInfo search(String? text) {
     setState(() {
-      _textController = buildController(
-        text: _textController.text,
-        highlightText: text,
-        theme: widget.theme,
-      );
+      _replaceTextController(highlightText: text);
       _titleTextController = buildController(
         text: _titleTextController.text,
         highlightText: text,
@@ -274,12 +356,7 @@ class MarkdownEditorState extends State<MarkdownEditor>
   @override
   void scrollToResult(String text, int num) {
     setState(() {
-      _textController = buildController(
-        text: _textController.text,
-        highlightText: text,
-        theme: widget.theme,
-        currentPos: num,
-      );
+      _replaceTextController(highlightText: text, currentPos: num);
     });
 
     scrollToSearchResult(

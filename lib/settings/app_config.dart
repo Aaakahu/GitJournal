@@ -34,6 +34,9 @@ class AppConfig extends ChangeNotifier {
   var experimentalAccounts = false;
   var experimentalTagAutoCompletion = false;
 
+  // Live Markdown preview in the editor (split screen)
+  var livePreview = false;
+
   void load(SharedPreferences pref) {
     onBoardingCompleted = pref.getBool("onBoardingCompleted") ?? false;
 
@@ -54,6 +57,7 @@ class AppConfig extends ChangeNotifier {
     experimentalTagAutoCompletion =
         pref.getBool("experimentalTagAutoCompletion") ??
             experimentalTagAutoCompletion;
+    livePreview = pref.getBool("livePreview") ?? livePreview;
   }
 
   Future<void> save() async {
@@ -80,6 +84,7 @@ class AppConfig extends ChangeNotifier {
         "experimentalTagAutoCompletion",
         experimentalTagAutoCompletion,
         defaultSet.experimentalTagAutoCompletion);
+    _setBool(pref, "livePreview", livePreview, defaultSet.livePreview);
 
     pref.setInt("appSettingsVersion", version);
 
@@ -97,6 +102,7 @@ class AppConfig extends ChangeNotifier {
       'experimentalMarkdownToolbar': experimentalMarkdownToolbar.toString(),
       'experimentalAccounts': experimentalAccounts.toString(),
       'experimentalTagAutoCompletion': experimentalTagAutoCompletion.toString(),
+      'livePreview': livePreview.toString(),
     };
   }
 
