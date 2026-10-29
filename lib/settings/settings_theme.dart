@@ -4,13 +4,11 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-import 'package:carousel_slider/carousel_slider.dart';
-// import 'package:flex_color_scheme/flex_color_scheme.dart';
 import 'package:flutter/material.dart';
 import 'package:gitjournal/l10n.dart';
-import 'package:gitjournal/screens/home_screen.dart';
 import 'package:gitjournal/settings/settings.dart';
 import 'package:gitjournal/themes.dart';
+import 'package:gitjournal/themes/glass_theme.dart';
 import 'package:provider/provider.dart';
 
 class SettingsThemeScreen extends StatefulWidget {
@@ -24,43 +22,53 @@ class SettingsThemeScreen extends StatefulWidget {
   _SettingsThemeState createState() => _SettingsThemeState();
 }
 
+class _ThemeOption {
+  final String internalName;
+  final String label;
+  final ThemeData themeData;
+
+  const _ThemeOption(this.internalName, this.label, this.themeData);
+}
+
 class _SettingsThemeState extends State<SettingsThemeScreen> {
   @override
   Widget build(BuildContext context) {
-    var mq = MediaQuery.of(context);
+    var settings = context.watch<Settings>();
+    var selected = widget.brightness == Brightness.light
+        ? settings.lightTheme
+        : settings.darkTheme;
 
-    var body = CarouselSlider(
-      options: CarouselOptions(
-        height: mq.size.height * 0.75,
-        enlargeCenterPage: true,
-        viewportFraction: 0.55,
-        enableInfiniteScroll: false,
+    var glassName = widget.brightness == Brightness.light
+        ? GLASS_LIGHT_THEME_NAME
+        : GLASS_DARK_THEME_NAME;
+    var options = <_ThemeOption>[
+      _ThemeOption(glassName, "Glass", Themes.fromName(glassName)),
+      _ThemeOption(
+        DEFAULT_LIGHT_THEME_NAME_LEGACY,
+        context.loc.settingsThemeLight,
+        Themes.fromName(DEFAULT_LIGHT_THEME_NAME_LEGACY),
       ),
-      items: [0, 1, 2, 3].map((i) {
-        return Builder(
-          builder: (BuildContext context) {
-            return Container(
-              width: MediaQuery.of(context).size.width,
-              margin: const EdgeInsets.symmetric(horizontal: 5.0),
-              // decoration: BoxDecoration(color: Colors.amber),
-              child: homeScreen(i),
-            );
-          },
-        );
-      }).toList(),
-    );
+      _ThemeOption(
+        DEFAULT_DARK_THEME_NAME_LEGACY,
+        context.loc.settingsThemeDark,
+        Themes.fromName(DEFAULT_DARK_THEME_NAME_LEGACY),
+      ),
+    ];
 
     var title = widget.brightness == Brightness.light
         ? context.loc.settingsThemeLight
         : context.loc.settingsThemeDark;
 
-    var settings = context.watch<Settings>();
-    var themeName = widget.brightness == Brightness.light
-        ? settings.lightTheme
-        : settings.darkTheme;
+    var body = ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        for (var option in options)
+          _optionCard(context, option, selected, settings),
+      ],
+    );
 
     return Theme(
-      data: Themes.fromName(themeName),
+      data: Themes.fromName(selected),
       child: Scaffold(
         appBar: AppBar(
           title: Text(title),
@@ -76,95 +84,94 @@ class _SettingsThemeState extends State<SettingsThemeScreen> {
     );
   }
 
-  Widget homeScreen(int i) {
-    var themes = [
-      /*
-      GitJournalTheme.fromFlexLight(
-        name: "Mandy Red",
-        flexScheme: FlexScheme.mandyRed,
-      ),
-      GitJournalTheme.fromFlexLight(
-        name: "Blue",
-        flexScheme: FlexScheme.blue,
-      ),
-      GitJournalTheme.fromFlexLight(
-        name: "Big Stone",
-        flexScheme: FlexScheme.bigStone,
-      ),
-      GitJournalTheme.fromFlexLight(
-        name: "Amber",
-        flexScheme: FlexScheme.amber,
-      ),
-      */
-    ];
+  Widget _optionCard(
+    BuildContext context,
+    _ThemeOption option,
+    String selected,
+    Settings settings,
+  ) {
+    var isSelected = option.internalName == selected;
+    var tokens = option.themeData.extension<GlassTokens>();
 
-    return _GitJournalThemeView(gjTheme: themes[i]);
-  }
-}
-
-class _GitJournalThemeView extends StatelessWidget {
-  final GitJournalTheme gjTheme;
-
-  const _GitJournalThemeView({required this.gjTheme});
-
-  @override
-  Widget build(BuildContext context) {
-    var mq = MediaQuery.of(context);
-
-    var homeScreen = Theme(
-      data: gjTheme.themeData,
-      child: SizedBox(
-        width: mq.size.width,
-        height: mq.size.height,
-        child: IgnorePointer(
-          // ignoringSemantics: true,
-          child: HomeScreen(),
-        ),
-      ),
-    );
-
-    var theme = Theme.of(context);
-
-    return FittedBox(
+    var row = InkWell(
+      onTap: () {
+        if (widget.brightness == Brightness.light) {
+          settings.lightTheme = option.internalName;
+        } else {
+          settings.darkTheme = option.internalName;
+        }
+        settings.save();
+      },
+      borderRadius: BorderRadius.circular(14),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
+        padding: const EdgeInsets.all(16),
+        child: Row(
           children: [
-            Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: theme.dividerColor),
+            ..._swatches(option.themeData).map(_swatchDot),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                option.label,
+                style: option.themeData.textTheme.titleMedium,
               ),
-              child: homeScreen,
             ),
-            const SizedBox(height: 32),
-            Text(
-              gjTheme.name,
-              style: Theme.of(context).textTheme.displaySmall!.copyWith(
-                    fontWeight: FontWeight.w400,
-                  ),
-            ),
+            if (isSelected)
+              Icon(
+                Icons.check_circle,
+                color: option.themeData.colorScheme.secondary,
+              ),
           ],
         ),
       ),
     );
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Theme(
+        data: option.themeData,
+        child: tokens == null
+            ? Container(
+                decoration: BoxDecoration(
+                  color: option.themeData.cardColor,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: option.themeData.dividerColor),
+                ),
+                child: row,
+              )
+            : GlassPanel(
+                fill: tokens.card,
+                padding: EdgeInsets.zero,
+                child: row,
+              ),
+      ),
+    );
   }
-}
 
-// 1. Improve the carrosuel
-// 3. Show Telegram type animation when changing the theme
-// 5. Hook it up so the theme is actually saved
-//
+  List<Color> _swatches(ThemeData theme) {
+    final tokens = theme.extension<GlassTokens>();
+    if (tokens != null) {
+      return [tokens.base, tokens.card, tokens.primary, tokens.accent];
+    }
+    return [
+      theme.scaffoldBackgroundColor,
+      theme.cardColor,
+      theme.colorScheme.primary,
+      theme.colorScheme.secondary,
+    ];
+  }
 
-class GitJournalTheme {
-  final ThemeData themeData;
-  final String name;
-
-  GitJournalTheme({required this.name, required this.themeData});
-
-  /*
-  GitJournalTheme.fromFlexLight({
-    required this.name,
-    required FlexScheme flexScheme,
-  }) : themeData = FlexColorScheme.light(scheme: flexScheme).toTheme;
-  */
+  Widget _swatchDot(Color color) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 6),
+      child: Container(
+        width: 24,
+        height: 24,
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.black26),
+        ),
+      ),
+    );
+  }
 }

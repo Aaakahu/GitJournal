@@ -24,6 +24,7 @@ import 'package:gitjournal/settings/app_config.dart';
 import 'package:gitjournal/settings/settings.dart';
 import 'package:gitjournal/settings/storage_config.dart';
 import 'package:gitjournal/themes.dart';
+import 'package:gitjournal/themes/glass_theme.dart';
 import 'package:hive/hive.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -325,6 +326,17 @@ class JournalAppState extends State<JournalApp> {
       theme: Themes.fromName(settings.lightTheme),
       darkTheme: Themes.fromName(settings.darkTheme),
       themeMode: themeMode,
+      // Light Glass theme paints its ambient radial glows behind the
+      // navigator; its scaffold background is transparent.
+      builder: (context, child) {
+        final theme = Theme.of(context);
+        if (theme.extension<GlassTokens>() == null ||
+            theme.brightness != Brightness.light ||
+            child == null) {
+          return child ?? const SizedBox.shrink();
+        }
+        return GlassBackground(child: child);
+      },
       navigatorObservers: <NavigatorObserver>[
         AnalyticsRouteObserver(),
         SentryNavigatorObserver(),

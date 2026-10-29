@@ -20,8 +20,17 @@ import 'settings_sharedpref.dart';
 const DEFAULT_ID = "0";
 const SETTINGS_VERSION = 3;
 
-const DEFAULT_LIGHT_THEME_NAME = "LightDefault";
-const DEFAULT_DARK_THEME_NAME = "DarkDefault";
+// Glass is the default theme pair.
+const GLASS_LIGHT_THEME_NAME = "GlassLight";
+const GLASS_DARK_THEME_NAME = "GlassDark";
+
+// Legacy names kept resolvable in Themes.fromName so stored preferences and
+// rollbacks keep working.
+const DEFAULT_LIGHT_THEME_NAME_LEGACY = "LightDefault";
+const DEFAULT_DARK_THEME_NAME_LEGACY = "DarkDefault";
+
+const DEFAULT_LIGHT_THEME_NAME = GLASS_LIGHT_THEME_NAME;
+const DEFAULT_DARK_THEME_NAME = GLASS_DARK_THEME_NAME;
 
 const DEFAULT_BRANCH = 'main';
 
