@@ -22,7 +22,7 @@ if (!keystoreProperties.containsKey('keyAlias')) {
 }
 
 android {
-    namespace 'io.gitjournal.gitjournal'
+    namespace 'io.aakahu.gitjournalglass'
     compileSdkVersion flutter.compileSdkVersion
     ndkVersion "28.2.13676358"
 
@@ -32,7 +32,7 @@ android {
     }
 
     defaultConfig {
-        applicationId "io.gitjournal.gitjournal"
+        applicationId "io.aakahu.gitjournalglass"
         minSdkVersion flutter.minSdkVersion
         targetSdkVersion flutter.targetSdkVersion
         versionCode flutter.versionCode

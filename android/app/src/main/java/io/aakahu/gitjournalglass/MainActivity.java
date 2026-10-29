@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-package io.gitjournal.gitjournal;
+package io.aakahu.gitjournalglass;
 
 import androidx.annotation.NonNull;
 

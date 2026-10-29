@@ -67,3 +67,9 @@ debugSymbols
 # Linux Building
 /AppDir
 appimage-builder-cache/
+
+# Local signing keystore & Flutter tool state (GitJournal Glass)
+android/app/local
+.flutter
+.flutter_tool_state
+ios/Flutter/ephemeral/

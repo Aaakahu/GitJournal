@@ -6,7 +6,7 @@ SPDX-License-Identifier: Apache-2.0
 
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    package="io.gitjournal.gitjournal">
+    package="io.aakahu.gitjournalglass">
 
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="com.android.vending.BILLING" />
