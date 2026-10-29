@@ -18,6 +18,7 @@ import 'package:gitjournal/markdown/parsers/hardwrap.dart';
 import 'package:gitjournal/markdown/parsers/html_entities_syntax.dart';
 import 'package:gitjournal/settings/settings.dart';
 import 'package:gitjournal/utils/link_resolver.dart';
+import 'package:gitjournal/utils/markdown.dart';
 import 'package:gitjournal/utils/utils.dart';
 import 'package:gitjournal/widgets/images/markdown_image.dart';
 import 'package:markdown/markdown.dart' as md;
@@ -31,10 +32,16 @@ class MarkdownRenderer extends StatelessWidget {
   final Note note;
   final Func1<Note, void> onNoteTapped;
 
+  /// Called with the [start] and [end] offsets of the resized image's markup
+  /// inside [Note.body] and the new width in logical pixels. When null, no
+  /// resize handle is rendered.
+  final void Function(int start, int end, double width)? onImageResized;
+
   const MarkdownRenderer({
     super.key,
     required this.note,
     required this.onNoteTapped,
+    this.onImageResized,
   });
 
   @override
@@ -80,6 +87,15 @@ class MarkdownRenderer extends StatelessWidget {
       ),
     );
 
+    // The images are rendered in document order, so the n-th imageBuilder
+    // invocation corresponds to the n-th image markup in the body. This lets
+    // us map a rendered image back to its exact markup position.
+    List<RegExpMatch>? imageMatches;
+    var imageIndex = 0;
+    if (onImageResized != null) {
+      imageMatches = imageMarkupRegex.allMatches(note.body).toList();
+    }
+
     var view = MarkdownBody(
       data: note.body,
       // selectable: false, -> making this true breaks link navigation
@@ -119,9 +135,34 @@ class MarkdownRenderer extends StatelessWidget {
           );
         }
       },
-      imageBuilder: (url, title, alt) => MarkdownImage(
-          url, p.join(note.repoPath, note.parent.folderPath),
-          titel: title, altText: alt),
+      imageBuilder: (url, title, alt) {
+        final match =
+            imageUrlWidthSuffixRegex.firstMatch(url.toString());
+        var imagePath = url;
+        double? width;
+        if (match != null) {
+          imagePath = Uri.parse(match.group(1)!);
+          width = double.parse(match.group(2)!);
+        }
+
+        void Function(double)? onResizeEnd;
+        if (onImageResized != null && imageMatches != null) {
+          final i = imageIndex++;
+          if (i < imageMatches.length && imageMatches[i].group(2) == imagePath.toString()) {
+            final markupMatch = imageMatches[i];
+            onResizeEnd = (newWidth) =>
+                onImageResized!(markupMatch.start, markupMatch.end, newWidth);
+          }
+        }
+
+        return MarkdownImage(
+          imagePath, p.join(note.repoPath, note.parent.folderPath),
+          width: width,
+          titel: title,
+          altText: alt,
+          onResizeEnd: onResizeEnd,
+        );
+      },
       extensionSet: markdownExtensions(hardWrapEnabled: settings.hardWrap),
       builders: {
         KatexBuilder.tag: KatexBuilder(),

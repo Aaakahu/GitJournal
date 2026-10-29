@@ -7,6 +7,37 @@
 import 'dart:convert';
 import 'dart:core';
 
+/// Matches image markups with local paths: `![alt](path)` or
+/// `![alt](path|width)` where `|width` is our display-width extension
+/// (in logical pixels).
+final RegExp imageMarkupRegex =
+    RegExp(r'!\[([^\]]*)\]\(([^()\s|]+)(?:\|(\d+))?\)');
+
+/// Splits the rendered image URL into its path and the `|width` suffix.
+/// The `|` survives the markdown parser percent-encoded as `%7C`.
+final RegExp imageUrlWidthSuffixRegex =
+    RegExp(r'^(.*?)(?:%7C|\|)(\d+)$', caseSensitive: false);
+
+/// The path of the first local image markup in the markdown [body],
+/// or null if there is none.
+String? firstLocalImagePath(String body) {
+  for (var match in imageMarkupRegex.allMatches(body)) {
+    var path = match.group(2)!;
+    if (!path.contains('://')) {
+      return path;
+    }
+  }
+  return null;
+}
+
+/// Rewrites the `|width` suffix of an image [markup] with [newWidth].
+/// Returns null if the [markup] isn't an image markup.
+String? imageMarkupWithWidth(String markup, int newWidth) {
+  var match = imageMarkupRegex.firstMatch(markup);
+  if (match == null) return null;
+  return '![${match.group(1)}](${match.group(2)}|$newWidth)';
+}
+
 String stripMarkdownFormatting(String markdown) {
   var output = StringBuffer();
 

@@ -17,7 +17,7 @@ import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 import 'package:universal_io/io.dart';
 
-class MarkdownImage extends StatelessWidget {
+class MarkdownImage extends StatefulWidget {
   final double? width;
   final double? height;
   final String altText;
@@ -26,13 +26,22 @@ class MarkdownImage extends StatelessWidget {
   // FIXME: Avoid using dynamic!
   final Future<dynamic> data;
 
-  const MarkdownImage._(
-      this.data, this.width, this.height, String? altText, String? tooltip)
+  /// When set, a drag handle is rendered at the bottom right corner which
+  /// lets the user change the image width. Called with the final width
+  /// (in logical pixels) once the drag ends.
+  final void Function(double width)? onResizeEnd;
+
+  const MarkdownImage._(this.data, this.width, this.height, String? altText,
+      String? tooltip, {this.onResizeEnd})
       : altText = altText ?? "",
         tooltip = tooltip ?? "";
 
   factory MarkdownImage(Uri uri, String imageDirectory,
-      {double? width, double? height, String? altText, String? titel}) {
+      {double? width,
+      double? height,
+      String? altText,
+      String? titel,
+      void Function(double width)? onResizeEnd}) {
     final file = ((uri.isScheme("http") || uri.isScheme("https"))
         ? DefaultCacheManager().getSingleFile(uri.toString())
         : Future.sync(() =>
@@ -41,30 +50,40 @@ class MarkdownImage extends StatelessWidget {
     final data = file.then(
         (value) => value.path.endsWith(".svg") ? value.readAsString() : file);
 
-    return MarkdownImage._(data, width, height, altText, titel);
+    return MarkdownImage._(data, width, height, altText, titel,
+        onResizeEnd: onResizeEnd);
   }
+
+  @override
+  State<MarkdownImage> createState() => _MarkdownImageState();
+}
+
+class _MarkdownImageState extends State<MarkdownImage> {
+  // The width while the resize handle is being dragged, null otherwise
+  double? _dragWidth;
 
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<MarkdownRendererConfig>();
     final theme = Theme.of(context);
     final dark = theme.brightness == Brightness.dark;
+    final width = _dragWidth ?? widget.width;
 
     // Test for override tags in AltText/Tooltip
     ThemeOverride override = ThemeOverride.None;
     if (settings.themeOverrideTagLocation == SettingsImageTextType.Alt ||
         settings.themeOverrideTagLocation == SettingsImageTextType.AltTool) {
-      if (hasTag(altText, settings.doThemeTags)) {
+      if (hasTag(widget.altText, settings.doThemeTags)) {
         override = ThemeOverride.Do;
-      } else if (hasTag(altText, settings.doNotThemeTags)) {
+      } else if (hasTag(widget.altText, settings.doNotThemeTags)) {
         override = ThemeOverride.No;
       }
     }
     if (settings.themeOverrideTagLocation == SettingsImageTextType.Tooltip ||
         settings.themeOverrideTagLocation == SettingsImageTextType.AltTool) {
-      if (hasTag(tooltip, settings.doThemeTags)) {
+      if (hasTag(widget.tooltip, settings.doThemeTags)) {
         override = ThemeOverride.Do;
-      } else if (hasTag(tooltip, settings.doNotThemeTags)) {
+      } else if (hasTag(widget.tooltip, settings.doNotThemeTags)) {
         override = ThemeOverride.No;
       }
     }
@@ -74,7 +93,7 @@ class MarkdownImage extends StatelessWidget {
         final small =
             constraints.maxWidth < MediaQuery.of(context).size.width - 40;
         final image = FutureBuilder(
-            future: data,
+            future: widget.data,
             builder: (context, snapshot) {
               if (snapshot.hasError) {
                 String errorMessage = snapshot.error.toString();
@@ -87,7 +106,7 @@ class MarkdownImage extends StatelessWidget {
                 }
                 return SizedBox(
                   width: width,
-                  height: height,
+                  height: widget.height,
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Center(
@@ -119,7 +138,7 @@ class MarkdownImage extends StatelessWidget {
                   im = ThemableImage.svg(
                     snapshot.data as String,
                     width: width ?? MediaQuery.of(context).size.width,
-                    height: height,
+                    height: widget.height,
                     themingMethod: override == ThemeOverride.No ||
                             settings.themeVectorGraphics ==
                                     SettingsThemeVectorGraphics.Off &&
@@ -152,7 +171,7 @@ class MarkdownImage extends StatelessWidget {
                   im = ThemableImage.image(
                     snapshot.data as File,
                     width: width,
-                    height: height,
+                    height: widget.height,
                     doTheme: (settings.themeRasterGraphics ||
                             override == ThemeOverride.Do) &&
                         override != ThemeOverride.No &&
@@ -161,7 +180,7 @@ class MarkdownImage extends StatelessWidget {
                   );
                 }
 
-                return GestureDetector(
+                Widget image = GestureDetector(
                   child: im,
                   onTap: () {
                     Navigator.push(
@@ -169,34 +188,90 @@ class MarkdownImage extends StatelessWidget {
                       MaterialPageRoute(
                         builder: (context) => ImageDetails(
                           im as ThemableImage,
-                          captionText(context, altText, tooltip),
+                          captionText(context, widget.altText, widget.tooltip),
                         ),
                       ),
                     );
                   },
                 );
+
+                if (widget.onResizeEnd != null) {
+                  image = Stack(
+                    alignment: AlignmentDirectional.bottomEnd,
+                    children: [
+                      image,
+                      _buildResizeHandle(
+                        settings: settings,
+                        theme: theme,
+                        maxWidth: constraints.maxWidth,
+                      ),
+                    ],
+                  );
+                }
+
+                return image;
               }
 
               return SizedBox(
                   width: width,
-                  height: height,
+                  height: widget.height,
                   child: const Padding(
                       padding: EdgeInsets.all(16),
                       child: Center(child: CircularProgressIndicator())));
             });
 
-        if (shouldCaption(context, altText, tooltip)) {
+        if (shouldCaption(context, widget.altText, widget.tooltip)) {
           if (small || !settings.overlayCaption) {
             return Column(
-                children: [image, ImageCaption(altText, tooltip, false)]);
+                children: [image, ImageCaption(widget.altText, widget.tooltip, false)]);
           } else {
             return Stack(
                 alignment: AlignmentDirectional.bottomEnd,
-                children: [image, ImageCaption(altText, tooltip, true)]);
+                children: [
+                  image,
+                  ImageCaption(widget.altText, widget.tooltip, true)
+                ]);
           }
         }
         return image;
       },
+    );
+  }
+
+  Widget _buildResizeHandle({
+    required MarkdownRendererConfig settings,
+    required ThemeData theme,
+    required double maxWidth,
+  }) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onHorizontalDragUpdate: (details) {
+        setState(() {
+          var startWidth = _dragWidth ?? widget.width ?? maxWidth;
+          _dragWidth = (startWidth + details.delta.dx).clamp(40.0, maxWidth);
+        });
+      },
+      onHorizontalDragEnd: (details) {
+        final newWidth = _dragWidth;
+        setState(() => _dragWidth = null);
+        if (newWidth != null) {
+          widget.onResizeEnd!(newWidth);
+        }
+      },
+      child: Container(
+        width: 32.0,
+        height: 32.0,
+        margin: const EdgeInsets.all(4.0),
+        decoration: BoxDecoration(
+          color: getOverlayBackgroundColor(settings, theme),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          Icons.settings_ethernet,
+          size: 18.0,
+          color: theme.iconTheme.color,
+        ),
+      ),
     );
   }
 }
