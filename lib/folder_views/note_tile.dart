@@ -9,6 +9,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:gitjournal/core/note.dart';
 import 'package:gitjournal/core/notes/note.dart';
+import 'package:gitjournal/core/views/first_image_view.dart';
 import 'package:gitjournal/utils/markdown.dart';
 import 'package:gitjournal/widgets/highlighted_text.dart';
 import 'package:intl/intl.dart';
@@ -56,6 +57,7 @@ class NoteTile extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
+          NoteFirstImageThumbnail(note: note, height: 80.0),
           if (note.title != null)
             HighlightedText(
               text: note.title!,
@@ -110,8 +112,15 @@ class NoteTile extends StatelessWidget {
 
   static const _maxLines = 12;
 
-  // FIXME: vHanda: This doesn't need to be computed again and again!
+  // The tiles are rebuilt on every frame of the scrolling grid - cache the
+  // computed display text per (note version, search term).
+  static final _displayTextCache = <String, String>{};
+
   String _displayText() {
+    var cacheKey = '${note.oid}:$searchTerm';
+    var cached = _displayTextCache[cacheKey];
+    if (cached != null) return cached;
+
     var foundSearchTerm = searchTerm.isEmpty ? true : false;
     var buffer = <String>[];
     var i = 0;
@@ -134,7 +143,14 @@ class NoteTile extends StatelessWidget {
       buffer = buffer.sublist(buffer.length - _maxLines);
     }
 
-    return buffer.join("\n").trimRight();
+    var displayText = buffer.join("\n").trimRight();
+
+    if (_displayTextCache.length > 1024) {
+      _displayTextCache.clear();
+    }
+    _displayTextCache[cacheKey] = displayText;
+
+    return displayText;
   }
 
   Widget _buildBody(BuildContext context, String text) {

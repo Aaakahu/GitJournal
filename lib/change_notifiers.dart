@@ -12,6 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:gitjournal/core/folder/notes_folder_config.dart';
 import 'package:gitjournal/core/folder/notes_folder_fs.dart';
+import 'package:gitjournal/core/views/first_image_view.dart';
 import 'package:gitjournal/core/views/inline_tags_view.dart';
 import 'package:gitjournal/core/views/note_links_view.dart';
 import 'package:gitjournal/core/views/summary_view.dart';
@@ -91,6 +92,7 @@ class GitJournalChangeNotifiers extends StatelessWidget {
     return Nested(
       children: [
         NoteSummaryProvider(repoId: repoId),
+        NoteFirstImageProvider(repoId: repoId),
         InlineTagsProvider(repoId: repoId),
         NoteLinksProvider(repoId: repoId),
       ],

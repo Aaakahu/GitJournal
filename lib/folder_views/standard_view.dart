@@ -9,6 +9,7 @@ import 'package:gitjournal/core/folder/notes_folder.dart';
 import 'package:gitjournal/core/folder/sorting_mode.dart';
 import 'package:gitjournal/core/note.dart';
 import 'package:gitjournal/core/notes/note.dart';
+import 'package:gitjournal/core/views/first_image_view.dart';
 import 'package:gitjournal/core/views/summary_view.dart';
 import 'package:gitjournal/folder_views/journal_view.dart';
 import 'package:gitjournal/folder_views/list_view.dart';
@@ -206,6 +207,7 @@ class StandardNoteListTile extends StatelessWidget {
 
       tile = ListTile(
         isThreeLine: true,
+        leading: NoteFirstImageThumbnail(note: note, width: 56.0, height: 56.0),
         title: titleRow,
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -217,6 +219,7 @@ class StandardNoteListTile extends StatelessWidget {
     } else {
       tile = ListTile(
         isThreeLine: false,
+        leading: NoteFirstImageThumbnail(note: note, width: 56.0, height: 56.0),
         title: titleRow,
         onTap: () => noteTapped(note),
         onLongPress: () => noteLongPressed(note),
