@@ -51,38 +51,64 @@ class NoteTile extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: const BorderRadius.all(Radius.circular(8)),
         border: Border.all(color: borderColor, width: selected ? 2.0 : 1.0),
+        // Lifts the card off the background a little.
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 6.0,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          NoteFirstImageThumbnail(note: note, height: 80.0),
+          // Image area: intrinsic aspect ratio, capped so portrait photos
+          // don't swallow the whole card.
+          NoteFirstImageThumbnail(
+            note: note,
+            maxHeight: 260.0,
+            cacheWidth: 800,
+          ),
           if (note.title != null)
-            HighlightedText(
-              text: note.title!,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: textTheme.titleLarge!
-                  .copyWith(fontSize: textTheme.titleLarge!.fontSize! * 0.8),
-              highlightText: searchTerm,
-              highlightTextLowerCase: searchTermLowerCase,
+            Padding(
+              padding: const EdgeInsets.only(top: 8.0),
+              child: HighlightedText(
+                text: note.title!,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.titleLarge!
+                    .copyWith(fontSize: textTheme.titleLarge!.fontSize! * 0.8),
+                highlightText: searchTerm,
+                highlightTextLowerCase: searchTermLowerCase,
+              ),
             ),
-          if (note.title != null) const SizedBox(height: 8.0),
           if (note.title == null && note.type == NoteType.Journal)
-            HighlightedText(
-              text: '${note.created.day} ${DateFormat('MMMM, yyyy').format(note.created)}\n${DateFormat('EEEE HH:mm').format(note.created)}',
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: textTheme.titleLarge!
-                  .copyWith(fontSize: textTheme.titleLarge!.fontSize! * 0.8),
-              highlightText: searchTerm,
-              highlightTextLowerCase: searchTermLowerCase,
+            Padding(
+              padding: const EdgeInsets.only(top: 8.0),
+              child: HighlightedText(
+                text: '${note.created.day} ${DateFormat('MMMM, yyyy').format(note.created)}\n${DateFormat('EEEE HH:mm').format(note.created)}',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.titleLarge!
+                    .copyWith(fontSize: textTheme.titleLarge!.fontSize! * 0.8),
+                highlightText: searchTerm,
+                highlightTextLowerCase: searchTermLowerCase,
+              ),
             ),
-          if (note.title == null && note.type == NoteType.Journal) const SizedBox(height: 8.0),
-          Flexible(
-            flex: 1,
-            child: _buildBody(context, body),
+          if (body.isNotEmpty) ...[
+            const SizedBox(height: 8.0),
+            _buildBody(context, body),
+          ],
+          const SizedBox(height: 8.0),
+          Align(
+            alignment: AlignmentDirectional.centerEnd,
+            child: Text(
+              DateFormat('MM-dd HH:mm').format(note.modified),
+              style: textTheme.bodySmall!.copyWith(color: theme.hintColor),
+            ),
           ),
         ],
       ),
@@ -125,8 +151,20 @@ class NoteTile extends StatelessWidget {
     var buffer = <String>[];
     var i = 0;
 
-    for (var line in LineSplitter.split(note.body)) {
+    for (var rawLine in LineSplitter.split(note.body)) {
+      // Image markups and header hashes are markup fragments that carry no
+      // meaning in a card summary - drop them, along with lines that only
+      // held an image so they don't eat summary lines.
+      var line = rawLine.replaceAll(imageMarkupRegex, '');
+      line = line.replaceAll(RegExp(' {2,}'), ' ');
       line = replaceMarkdownChars(line);
+      if (line.trimLeft().startsWith('#')) {
+        line = line.replaceAll('#', '');
+      }
+      line = line.trim();
+      if (line.isEmpty) {
+        continue;
+      }
       buffer.add(line);
 
       if (line.toLowerCase().contains(searchTermLowerCase)) {
@@ -144,6 +182,11 @@ class NoteTile extends StatelessWidget {
     }
 
     var displayText = buffer.join("\n").trimRight();
+
+    if (displayText.isEmpty &&
+        imageMarkupRegex.hasMatch(note.body)) {
+      displayText = '[图片]';
+    }
 
     if (_displayTextCache.length > 1024) {
       _displayTextCache.clear();
@@ -163,7 +206,7 @@ class NoteTile extends StatelessWidget {
       style: textTheme.titleMedium!
           .copyWith(fontSize: textTheme.titleMedium!.fontSize! * 0.9),
       overflow: TextOverflow.ellipsis,
-      maxLines: _maxLines - 1,
+      maxLines: 3,
     );
   }
 }

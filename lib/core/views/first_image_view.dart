@@ -67,11 +67,18 @@ class NoteFirstImageThumbnail extends StatelessWidget {
   final double? width;
   final double? height;
 
+  /// Caps the image height while keeping its intrinsic aspect ratio; the
+  /// cover fit crops the overflow. The leading [height] stays an exact fit.
+  final double? maxHeight;
+  final int cacheWidth;
+
   const NoteFirstImageThumbnail({
     super.key,
     required this.note,
     this.width,
     this.height,
+    this.maxHeight,
+    this.cacheWidth = 256,
   });
 
   @override
@@ -83,16 +90,23 @@ class NoteFirstImageThumbnail extends StatelessWidget {
         if (path == null || path.isEmpty) {
           return const SizedBox();
         }
+        Widget image = Image.file(
+          File(path),
+          width: width,
+          height: height,
+          fit: BoxFit.cover,
+          cacheWidth: cacheWidth,
+          errorBuilder: (_, __, ___) => const SizedBox(),
+        );
+        if (maxHeight != null) {
+          image = ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: maxHeight!),
+            child: image,
+          );
+        }
         return ClipRRect(
           borderRadius: BorderRadius.circular(4.0),
-          child: Image.file(
-            File(path),
-            width: width,
-            height: height,
-            fit: BoxFit.cover,
-            cacheWidth: 256,
-            errorBuilder: (_, __, ___) => const SizedBox(),
-          ),
+          child: image,
         );
       },
     );

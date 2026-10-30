@@ -46,5 +46,5 @@ class NoteSummaryProvider extends SingleChildStatelessWidget {
 // FIXME: When building this, take the title type into account
 //         If the summary starts with the title, then remove it
 Future<String> _compute(Note note) async {
-  return stripMarkdownFormatting(note.body);
+  return noteSummaryText(note.body);
 }

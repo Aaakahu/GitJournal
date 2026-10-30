@@ -59,6 +59,21 @@ String stripMarkdownFormatting(String markdown) {
   return output.toString().trimRight();
 }
 
+/// Summary text for list tiles: like [stripMarkdownFormatting], but image
+/// markups are dropped entirely - in a card they only leave clutter. When
+/// nothing textual remains and the note does contain images, a "[图片]"
+/// placeholder keeps the tile from looking empty.
+String noteSummaryText(String markdown) {
+  var hasImage = imageMarkupRegex.hasMatch(markdown);
+  var text = stripMarkdownFormatting(markdown.replaceAll(imageMarkupRegex, ''));
+  // Drop the double spaces left behind where an image sat mid-line.
+  text = text.replaceAll(RegExp(' {2,}'), ' ');
+  if (text.isEmpty && hasImage) {
+    return '[图片]';
+  }
+  return text;
+}
+
 String replaceMarkdownChars(String line) {
   line = line.replaceFirst('- [ ]', '☐');
   line = line.replaceFirst('- [x]', '☑');

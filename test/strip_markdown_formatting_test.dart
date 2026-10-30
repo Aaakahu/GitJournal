@@ -75,4 +75,22 @@ look like:
       expect(stripMarkdownFormatting(input), input);
     });
   });
+
+  group('Note Summary Text', () {
+    test('Images are dropped', () {
+      expect(noteSummaryText('Look ![img](pic.jpg) here'), 'Look here');
+      expect(noteSummaryText('# Title\n![img](pic.jpg|200)\nText'),
+          'Title Text');
+    });
+
+    test('Image only note gets a placeholder', () {
+      expect(noteSummaryText('![img](pic.jpg)'), '[图片]');
+      expect(noteSummaryText('![img](pic.jpg|200)'), '[图片]');
+    });
+
+    test('Text only note unchanged', () {
+      expect(noteSummaryText('Just text'), 'Just text');
+      expect(noteSummaryText(''), '');
+    });
+  });
 }

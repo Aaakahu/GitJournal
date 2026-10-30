@@ -63,7 +63,7 @@ class CardView extends StatelessWidget {
           searchTerm: searchTerm,
         );
       },
-      maxCrossAxisExtent: 200.0,
+      maxCrossAxisExtent: 180.0,
       staggeredTileBuilder: (int i) => stagTile,
       mainAxisSpacing: 8.0,
       crossAxisSpacing: 8.0,
