@@ -15,7 +15,6 @@ import 'package:gitjournal/editors/note_body_editor.dart';
 import 'package:gitjournal/settings/settings.dart';
 import 'package:gitjournal/widgets/note_viewer.dart';
 import 'package:provider/provider.dart';
-import 'package:time/time.dart';
 
 class EditorScaffold extends StatefulWidget {
   final Note startingNote;
@@ -59,7 +58,6 @@ class EditorScaffold extends StatefulWidget {
 }
 
 class _EditorScaffoldState extends State<EditorScaffold> {
-  var _hideUIElements = false;
   var _editingMode = true;
   var _findMode = false;
 
@@ -81,7 +79,6 @@ class _EditorScaffoldState extends State<EditorScaffold> {
     var settings = context.read<Settings>();
 
     setState(() {
-      _hideUIElements = settings.zenMode;
       widget.editorState.addListener(_editorChanged);
 
       if (settings.markdownDefaultView ==
@@ -107,13 +104,7 @@ class _EditorScaffoldState extends State<EditorScaffold> {
   }
 
   void _editorChanged() {
-    var settings = context.read<Settings>();
-
-    if (settings.zenMode && !_hideUIElements) {
-      setState(() {
-        _hideUIElements = true;
-      });
-    }
+    note = widget.editorState.getNote();
   }
 
   void _switchMode() {
@@ -136,8 +127,6 @@ class _EditorScaffoldState extends State<EditorScaffold> {
 
   @override
   Widget build(BuildContext context) {
-    var settings = context.watch<Settings>();
-
     var responsiveBody = LayoutBuilder(builder: (context, constraints) {
       // FIXME: This shouldn't depend on the font
       var ch = textSize('0', NoteBodyEditor.textStyle(context));
@@ -162,99 +151,49 @@ class _EditorScaffoldState extends State<EditorScaffold> {
     });
 
     return Scaffold(
-      body: GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        onTap: () {
-          if (settings.zenMode) {
-            setState(() {
-              _hideUIElements = false;
-            });
-          }
-        },
-        child: Column(
-          children: <Widget>[
-            if (!_findMode)
-              _HideWidget(
-                visible: !_hideUIElements,
-                child: EditorAppBar(
-                  editor: widget.editor,
-                  editorState: widget.editorState,
-                  noteModified: widget.noteModified,
-                  extraButton: widget.extraButton,
-                  allowEdits: _editingMode,
-                  onEditingModeChange: _switchMode,
-                ),
-              ),
-            if (_findMode)
-              _HideWidget(
-                visible: !_hideUIElements,
-                child: EditorAppSearchBar(
-                  editorState: widget.editorState,
-                  onCloseSelected: () {
-                    setState(() {
-                      _findMode = false;
-                    });
-                  },
-                  scrollToResult: widget.editorState.scrollToResult,
-                ),
-              ),
-            Expanded(
-              child: Hero(tag: note.filePath, child: responsiveBody),
+      body: Column(
+        children: <Widget>[
+          if (!_findMode)
+            EditorAppBar(
+              editor: widget.editor,
+              editorState: widget.editorState,
+              noteModified: widget.noteModified,
+              extraButton: widget.extraButton,
+              allowEdits: _editingMode,
+              onEditingModeChange: _switchMode,
             ),
-            _HideWidget(
-              visible: !_hideUIElements,
-              child: EditorBottomBar(
-                editor: widget.editor,
-                editorState: widget.editorState,
-                parentFolder: widget.parentFolder,
-                allowEdits: _editingMode,
-                zenMode: settings.zenMode,
-                onZenModeChanged: () {
-                  setState(() {
-                    settings.zenMode = !settings.zenMode;
-                    settings.save();
-
-                    if (settings.zenMode) {
-                      _hideUIElements = true;
-                    }
-                  });
-                },
-                metaDataEditable: note.canHaveMetadata,
-                onUndoSelected: widget.onUndoSelected,
-                onRedoSelected: widget.onRedoSelected,
-                undoAllowed: widget.undoAllowed,
-                redoAllowed: widget.redoAllowed,
-                findAllowed: widget.findAllowed,
-                onFindSelected: () {
-                  setState(() {
-                    _findMode = true;
-                  });
-                },
-              ),
+          if (_findMode)
+            EditorAppSearchBar(
+              editorState: widget.editorState,
+              onCloseSelected: () {
+                setState(() {
+                  _findMode = false;
+                });
+              },
+              scrollToResult: widget.editorState.scrollToResult,
             ),
-            if (widget.extraBottomWidget != null) widget.extraBottomWidget!,
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _HideWidget extends StatelessWidget {
-  final bool visible;
-  final Widget child;
-
-  const _HideWidget({required this.visible, required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    var opacity = visible ? 1.0 : 0.0;
-    return IgnorePointer(
-      ignoring: !visible,
-      child: AnimatedOpacity(
-        duration: 500.milliseconds,
-        opacity: opacity,
-        child: child,
+          Expanded(
+            child: Hero(tag: note.filePath, child: responsiveBody),
+          ),
+          EditorBottomBar(
+            editor: widget.editor,
+            editorState: widget.editorState,
+            parentFolder: widget.parentFolder,
+            allowEdits: _editingMode,
+            metaDataEditable: note.canHaveMetadata,
+            onUndoSelected: widget.onUndoSelected,
+            onRedoSelected: widget.onRedoSelected,
+            undoAllowed: widget.undoAllowed,
+            redoAllowed: widget.redoAllowed,
+            findAllowed: widget.findAllowed,
+            onFindSelected: () {
+              setState(() {
+                _findMode = true;
+              });
+            },
+          ),
+          if (widget.extraBottomWidget != null) widget.extraBottomWidget!,
+        ],
       ),
     );
   }

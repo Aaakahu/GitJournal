@@ -13,7 +13,6 @@ import 'package:gitjournal/settings/bug_report.dart';
 import 'package:gitjournal/settings/settings_about.dart';
 import 'package:gitjournal/settings/settings_analyatics.dart';
 import 'package:gitjournal/settings/settings_editors.dart';
-import 'package:gitjournal/settings/settings_experimental.dart';
 import 'package:gitjournal/settings/settings_git.dart';
 import 'package:gitjournal/settings/settings_storage.dart';
 import 'package:gitjournal/settings/settings_ui.dart';
@@ -104,20 +103,6 @@ class SettingsScreen extends StatelessWidget {
             var route = MaterialPageRoute(
               builder: (context) => const DebugScreen(),
               settings: const RouteSettings(name: DebugScreen.routePath),
-            );
-            Navigator.push(context, route);
-          },
-        ),
-        SettingsTile(
-          iconData: FontAwesomeIcons.flask,
-          title: context.loc.settingsListExperimentsTitle,
-          subtitle: context.loc.settingsListExperimentsSubtitle,
-          onTap: () {
-            var route = MaterialPageRoute(
-              builder: (context) => ExperimentalSettingsScreen(),
-              settings: const RouteSettings(
-                name: ExperimentalSettingsScreen.routePath,
-              ),
             );
             Navigator.push(context, route);
           },

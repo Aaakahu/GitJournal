@@ -225,9 +225,6 @@ class _NoopEditorCommon implements EditorCommon {
   void deleteNote(Note note) {}
 
   @override
-  void noteEditorChooserSelected(Note note) {}
-
-  @override
   void moveNoteToFolderSelected(Note note) {}
 
   @override

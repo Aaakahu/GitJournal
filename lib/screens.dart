@@ -21,9 +21,6 @@ import 'package:git_setup/screens.dart';
 import 'package:git_setup/screens_stories.dart';
 import 'package:git_setup/sshkey.dart';
 import 'package:gitjournal/core/folder/sorting_mode.dart';
-import 'package:gitjournal/core/notes/note.dart';
-import 'package:gitjournal/editors/common_types.dart';
-import 'package:gitjournal/editors/note_editor_selection_dialog.dart';
 import 'package:gitjournal/folder_listing/view/folder_listing.dart';
 import 'package:gitjournal/folder_views/common_types.dart';
 import 'package:gitjournal/folder_views/folder_view_configuration_dialog.dart';
@@ -324,13 +321,6 @@ var allScreens = [
     ),
   ]),
   TestScreenGroup(name: "Editor", screens: [
-    TestScreen(
-      name: "Selection Dialog",
-      builder: (_) => const NoteEditorSelectionDialog(
-        EditorType.Markdown,
-        NoteFileFormat.Markdown,
-      ),
-    ),
     TestScreen(
       name: "Rename Dialog",
       builder: (context) => RenameDialog(

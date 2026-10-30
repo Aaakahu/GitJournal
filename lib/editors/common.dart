@@ -28,7 +28,6 @@ abstract class EditorCommon {
   void editTags(Note note);
   void deleteNote(Note note);
 
-  void noteEditorChooserSelected(Note note);
   void moveNoteToFolderSelected(Note note);
   void exitEditorSelected(Note note);
 }
@@ -104,14 +103,6 @@ class EditorAppBar extends StatelessWidget implements PreferredSizeWidget {
               ? const Icon(Icons.remove_red_eye)
               : const Icon(Icons.edit),
           onPressed: onEditingModeChange,
-        ),
-        IconButton(
-          key: const ValueKey("EditorSelector"),
-          icon: const Icon(Icons.library_books),
-          onPressed: () {
-            var note = editorState.getNote();
-            editor.common.noteEditorChooserSelected(note);
-          },
         ),
         IconButton(
           icon: const Icon(Icons.delete),

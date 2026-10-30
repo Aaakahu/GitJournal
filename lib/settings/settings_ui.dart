@@ -8,7 +8,6 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:gitjournal/l10n.dart';
 import 'package:gitjournal/settings/settings.dart';
-import 'package:gitjournal/settings/settings_bottom_menu_bar.dart';
 import 'package:gitjournal/settings/settings_display_images.dart';
 import 'package:gitjournal/settings/settings_misc.dart';
 import 'package:gitjournal/settings/settings_screen.dart';
@@ -16,7 +15,6 @@ import 'package:gitjournal/settings/settings_theme.dart';
 import 'package:gitjournal/settings/widgets/language_selector.dart';
 import 'package:gitjournal/settings/widgets/settings_header.dart';
 import 'package:gitjournal/settings/widgets/settings_list_preference.dart';
-import 'package:gitjournal/widgets/pro_overlay.dart';
 import 'package:provider/provider.dart';
 
 const feature_themes = false;
@@ -86,34 +84,6 @@ class SettingsUIScreen extends StatelessWidget {
             );
             Navigator.push(context, route);
           },
-        ),
-        ProOverlay(
-          child: ListPreference(
-            title: context.loc.settingsDisplayHomeScreen,
-            currentOption: settings.homeScreen.toPublicString(context),
-            options: SettingsHomeScreen.options
-                .map((f) => f.toPublicString(context))
-                .toList(),
-            onChange: (String publicStr) {
-              var s = SettingsHomeScreen.fromPublicString(context, publicStr);
-              settings.homeScreen = s;
-              settings.save();
-            },
-          ),
-        ),
-        ProOverlay(
-          child: ListTile(
-            title: Text(context.loc.settingsBottomMenuBarTitle),
-            subtitle: Text(context.loc.settingsBottomMenuBarSubtitle),
-            onTap: () {
-              var route = MaterialPageRoute(
-                builder: (context) => BottomMenuBarSettings(),
-                settings:
-                    const RouteSettings(name: BottomMenuBarSettings.routePath),
-              );
-              Navigator.push(context, route);
-            },
-          ),
         ),
         ListTile(
           title: Text(context.loc.settingsMiscTitle),

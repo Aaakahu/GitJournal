@@ -21,8 +21,6 @@ class EditorBottomBar extends StatelessWidget {
   final EditorState editorState;
   final NotesFolderFS parentFolder;
   final bool allowEdits;
-  final bool zenMode;
-  final Func0<void> onZenModeChanged;
   final bool metaDataEditable;
 
   final bool undoAllowed;
@@ -40,8 +38,6 @@ class EditorBottomBar extends StatelessWidget {
     required this.editorState,
     required this.parentFolder,
     required this.allowEdits,
-    required this.zenMode,
-    required this.onZenModeChanged,
     required this.metaDataEditable,
     required this.onUndoSelected,
     required this.onRedoSelected,
@@ -72,8 +68,6 @@ class EditorBottomBar extends StatelessWidget {
           builder: (c) => BottomMenuSheet(
             editor: editor,
             editorState: editorState,
-            zenModeEnabled: zenMode,
-            zenModeChanged: onZenModeChanged,
             metaDataEditable: metaDataEditable,
             findAllowed: findAllowed,
             onFindSelected: onFindSelected,
@@ -191,8 +185,6 @@ class AddBottomSheet extends StatelessWidget {
 class BottomMenuSheet extends StatelessWidget {
   final Editor editor;
   final EditorState editorState;
-  final bool zenModeEnabled;
-  final Func0<void> zenModeChanged;
   final bool metaDataEditable;
 
   final bool findAllowed;
@@ -202,8 +194,6 @@ class BottomMenuSheet extends StatelessWidget {
     super.key,
     required this.editor,
     required this.editorState,
-    required this.zenModeEnabled,
-    required this.zenModeChanged,
     required this.metaDataEditable,
     required this.onFindSelected,
     required this.findAllowed,
@@ -258,18 +248,6 @@ class BottomMenuSheet extends StatelessWidget {
 
             editor.common.renameNote(note);
           },
-        ),
-        ProOverlay(
-          child: ListTile(
-            leading: const FaIcon(FontAwesomeIcons.peace),
-            title: Text(zenModeEnabled
-                ? context.loc.editorsCommonZenDisable
-                : context.loc.editorsCommonZenEnable),
-            onTap: () {
-              zenModeChanged();
-              Navigator.of(context).pop();
-            },
-          ),
         ),
         if (findAllowed)
           ListTile(
