@@ -1563,6 +1563,12 @@ abstract class AppLocalizations {
   /// **'Ed25519'**
   String get settingsSshKeyEd25519;
 
+  /// No description provided for @editorLivePreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Live preview'**
+  String get editorLivePreview;
+
   /// No description provided for @editorsChecklistAdd.
   ///
   /// In en, this message translates to:

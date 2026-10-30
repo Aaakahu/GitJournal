@@ -253,6 +253,7 @@
   "settingsSshKeyKeyType": "SSH Key Type",
   "settingsSshKeyRsa": "RSA",
   "settingsSshKeyEd25519": "Ed25519",
+  "editorLivePreview": "Live preview",
   "editorsChecklistAdd": "Add Item",
   "editorsCommonDefaultBodyHint": "Write here",
   "editorsCommonDefaultTitleHint": "Title",

@@ -796,6 +796,9 @@ class AppLocalizationsSv extends AppLocalizations {
   String get settingsSshKeyEd25519 => 'Ed25519';
 
   @override
+  String get editorLivePreview => 'Live preview';
+
+  @override
   String get editorsChecklistAdd => 'Add Item';
 
   @override

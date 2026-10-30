@@ -20,6 +20,7 @@ import 'package:gitjournal/editors/undo_redo.dart';
 import 'package:gitjournal/editors/utils/disposable_change_notifier.dart';
 import 'package:gitjournal/error_reporting.dart';
 import 'package:gitjournal/folder_views/common.dart';
+import 'package:gitjournal/l10n.dart';
 import 'package:gitjournal/logger/logger.dart';
 import 'package:gitjournal/markdown/markdown_renderer.dart';
 import 'package:gitjournal/settings/app_config.dart';
@@ -202,6 +203,7 @@ class MarkdownEditorState extends State<MarkdownEditor>
       undoAllowed: _undoRedoStack.undoPossible,
       redoAllowed: _undoRedoStack.redoPossible,
       extraButton: IconButton(
+        tooltip: context.loc.editorLivePreview,
         icon: Icon(
           Icons.vertical_split,
           color: appConfig.livePreview
