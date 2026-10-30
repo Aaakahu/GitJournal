@@ -74,4 +74,17 @@ class NotesMaterializedView<T> {
 
     return val!;
   }
+
+  /// Drops the cached entry of this note.
+  ///
+  /// The cache key is (oid, fileLastModified), which doesn't change when a
+  /// note is moved or its folder is renamed - call this so the stale value
+  /// (computed against the old path) isn't served again.
+  Future<void> invalidate(Note note) async {
+    var box = storageBox;
+    if (box == null) return;
+
+    var ts = note.fileLastModified.toUtc().millisecondsSinceEpoch ~/ 1000;
+    await box.delete('${note.oid}_$ts');
+  }
 }

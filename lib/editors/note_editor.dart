@@ -18,13 +18,13 @@ import 'package:gitjournal/core/markdown/md_yaml_doc.dart';
 import 'package:gitjournal/core/note.dart';
 import 'package:gitjournal/core/note_storage.dart';
 import 'package:gitjournal/core/notes/note.dart';
+import 'package:gitjournal/core/views/first_image_view.dart';
 import 'package:gitjournal/core/views/inline_tags_view.dart';
 import 'package:gitjournal/editors/checklist_editor.dart';
 import 'package:gitjournal/editors/common.dart';
 import 'package:gitjournal/editors/common_types.dart';
 import 'package:gitjournal/editors/journal_editor.dart';
 import 'package:gitjournal/editors/markdown_editor.dart';
-import 'package:gitjournal/editors/note_editor_selection_dialog.dart';
 import 'package:gitjournal/editors/org_editor.dart';
 import 'package:gitjournal/editors/raw_editor.dart';
 import 'package:gitjournal/error_reporting.dart';
@@ -33,7 +33,7 @@ import 'package:gitjournal/logger/logger.dart';
 import 'package:gitjournal/repository.dart';
 import 'package:gitjournal/settings/settings.dart';
 import 'package:gitjournal/utils/utils.dart';
-import 'package:gitjournal/widgets/folder_selection_dialog.dart';
+import 'package:gitjournal/widgets/memo_folder_selection_dialog.dart';
 import 'package:gitjournal/widgets/note_delete_dialog.dart';
 import 'package:gitjournal/widgets/note_tag_editor.dart';
 import 'package:gitjournal/widgets/rename_dialog.dart';
@@ -328,25 +328,6 @@ class NoteEditorState extends State<NoteEditor>
     }
   }
 
-  @override
-  Future<void> noteEditorChooserSelected(Note note) async {
-    assert(note.oid.isEmpty);
-
-    var newEditorType = await showDialog<EditorType>(
-      context: context,
-      builder: (BuildContext context) {
-        return NoteEditorSelectionDialog(_editorType, note.fileFormat);
-      },
-    );
-
-    if (newEditorType != null) {
-      setState(() {
-        _note = note;
-        _editorType = newEditorType;
-      });
-    }
-  }
-
   void _lockAndCall(Func1<Note, Future<void>> fn, Note note) {
     if (_lock.locked) {
       Log.w("UI Locked");
@@ -593,7 +574,7 @@ class NoteEditorState extends State<NoteEditor>
 
     var destFolder = await showDialog<NotesFolderFS>(
       context: context,
-      builder: (context) => FolderSelectionDialog(),
+      builder: (context) => const MemoFolderSelectionDialog(),
     );
     if (destFolder != null) {
       if (_isNewNote) {
@@ -603,6 +584,11 @@ class NoteEditorState extends State<NoteEditor>
       } else {
         try {
           var repo = context.read<GitJournalRepo>();
+
+          // The first-image cache is keyed by (oid, mtime) which doesn't
+          // change on a move - drop the stale entry pointing at the old path.
+          await NoteFirstImageProvider.of(context).invalidate(note);
+
           var n = await repo.moveNote(note, destFolder);
 
           setState(() {
