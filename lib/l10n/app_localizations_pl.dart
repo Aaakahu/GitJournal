@@ -1180,6 +1180,29 @@ class AppLocalizationsPl extends AppLocalizations {
   String get drawerHistory => 'History';
 
   @override
+  String get memoFoldersTitle => 'Folders';
+
+  @override
+  String get memoFoldersDefault => 'Default Folder';
+
+  @override
+  String get memoFoldersNewFolder => 'New Folder';
+
+  @override
+  String get memoFoldersDuplicateName =>
+      'A folder with this name already exists';
+
+  @override
+  String get memoFoldersDeleteConfirmTitle => 'Delete this folder?';
+
+  @override
+  String get memoFoldersDeleteConfirmBody =>
+      'The notes in this folder will be moved back to the default folder. No note will be lost.';
+
+  @override
+  String get memoFoldersMoveToTitle => 'Move to Folder';
+
+  @override
   String get setupAutoConfigureTitle => 'How do you want to do this?';
 
   @override

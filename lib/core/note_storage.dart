@@ -54,6 +54,9 @@ class NoteStorage {
     assert(note.fullFilePath.startsWith(p.separator));
 
     var file = io.File(note.fullFilePath);
+    // Memo folders are created lazily - the physical directory only appears
+    // when the first note is written into it (git doesn't track empty dirs).
+    await file.parent.create(recursive: true);
     await file.writeAsBytes(contents, flush: true);
 
     var stat = file.statSync();

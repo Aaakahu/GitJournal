@@ -8,25 +8,19 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:function_types/function_types.dart';
 import 'package:gitjournal/l10n.dart';
-import 'package:gitjournal/repository.dart';
 import 'package:gitjournal/repository_manager.dart';
 import 'package:gitjournal/settings/app_config.dart';
 import 'package:gitjournal/settings/settings.dart';
 import 'package:provider/provider.dart';
-import 'package:time/time.dart';
 
 class AppDrawerHeader extends StatelessWidget {
-  final Func0<void> repoListToggled;
-
-  const AppDrawerHeader({
-    required this.repoListToggled,
-  });
+  const AppDrawerHeader({super.key});
 
   @override
   Widget build(BuildContext context) {
     var appConfig = context.watch<AppConfig>();
+    var repoManager = context.watch<RepositoryManager>();
 
     var top = Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -47,8 +41,9 @@ class AppDrawerHeader extends StatelessWidget {
       ],
     );
 
-    var currentRepo = _CurrentRepo(
-      repoListToggled: repoListToggled,
+    var repoName = Text(
+      repoManager.repoFolderName(repoManager.currentId),
+      style: Theme.of(context).textTheme.titleLarge,
     );
 
     var header = DrawerHeader(
@@ -62,7 +57,7 @@ class AppDrawerHeader extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           top,
-          currentRepo,
+          repoName,
         ],
       ),
     );
@@ -78,128 +73,6 @@ class AppDrawerHeader extends StatelessWidget {
       color: Theme.of(context).colorScheme.secondary,
       child: header,
     );
-  }
-}
-
-class _CurrentRepo extends StatefulWidget {
-  const _CurrentRepo({
-    required this.repoListToggled,
-  });
-
-  final Func0<void> repoListToggled;
-
-  @override
-  __CurrentRepoState createState() => __CurrentRepoState();
-}
-
-class __CurrentRepoState extends State<_CurrentRepo>
-    with SingleTickerProviderStateMixin {
-  late Animation<double> _animation;
-  late AnimationController _controller;
-
-  var _gitRemoteUrl = "";
-  var _repoFolderName = "";
-
-  @override
-  void initState() {
-    super.initState();
-
-    _controller = AnimationController(duration: 250.milliseconds, vsync: this);
-    _animation = Tween(begin: 0.0, end: 0.5).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.linear,
-    ));
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    _fetchRepoInfo();
-
-    var textTheme = Theme.of(context).textTheme;
-
-    var w = Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: <Widget>[
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(_repoFolderName, style: textTheme.titleLarge),
-              const SizedBox(height: 8.0),
-              Text(
-                _gitRemoteUrl,
-                style: textTheme.titleSmall,
-                overflow: TextOverflow.clip,
-                maxLines: 1,
-              ),
-              const SizedBox(height: 8.0),
-            ],
-          ),
-        ),
-        RotationTransition(
-          turns: _animation,
-          child: IconButton(
-            icon: const FaIcon(FontAwesomeIcons.angleDown),
-            onPressed: _pressed,
-          ),
-        ),
-      ],
-    );
-
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: _pressed,
-      child: w,
-    );
-  }
-
-  void _pressed() {
-    if (_controller.isCompleted) {
-      _controller.reverse(from: 1.0);
-    } else {
-      _controller.forward(from: 0.0);
-    }
-    widget.repoListToggled();
-  }
-
-  Future<void> _fetchRepoInfo() async {
-    if (_repoFolderName.isNotEmpty) {
-      return;
-    }
-
-    var repoManager = context.watch<RepositoryManager>();
-    _repoFolderName = repoManager.repoFolderName(repoManager.currentId);
-
-    if (repoManager.currentRepoError != null) {
-      _gitRemoteUrl = "Error";
-      return;
-    }
-
-    var repo = context.watch<GitJournalRepo>();
-    var remoteConfigs = await repo.remoteConfigs();
-    if (!mounted) return;
-
-    if (remoteConfigs.isEmpty) {
-      setState(() {
-        _gitRemoteUrl = context.loc.drawerRemote;
-      });
-      return;
-    }
-
-    setState(() {
-      _gitRemoteUrl = remoteConfigs.first.url;
-      var i = _gitRemoteUrl.indexOf('@');
-      if (i != -1 && i + 1 < _gitRemoteUrl.length) {
-        _gitRemoteUrl = _gitRemoteUrl.substring(i + 1);
-      }
-    });
   }
 }
 

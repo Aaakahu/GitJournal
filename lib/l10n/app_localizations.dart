@@ -2241,6 +2241,48 @@ abstract class AppLocalizations {
   /// **'History'**
   String get drawerHistory;
 
+  /// No description provided for @memoFoldersTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Folders'**
+  String get memoFoldersTitle;
+
+  /// No description provided for @memoFoldersDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Default Folder'**
+  String get memoFoldersDefault;
+
+  /// No description provided for @memoFoldersNewFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'New Folder'**
+  String get memoFoldersNewFolder;
+
+  /// No description provided for @memoFoldersDuplicateName.
+  ///
+  /// In en, this message translates to:
+  /// **'A folder with this name already exists'**
+  String get memoFoldersDuplicateName;
+
+  /// No description provided for @memoFoldersDeleteConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this folder?'**
+  String get memoFoldersDeleteConfirmTitle;
+
+  /// No description provided for @memoFoldersDeleteConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The notes in this folder will be moved back to the default folder. No note will be lost.'**
+  String get memoFoldersDeleteConfirmBody;
+
+  /// No description provided for @memoFoldersMoveToTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Move to Folder'**
+  String get memoFoldersMoveToTitle;
+
   /// No description provided for @setupAutoConfigureTitle.
   ///
   /// In en, this message translates to:

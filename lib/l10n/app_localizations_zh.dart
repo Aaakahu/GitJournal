@@ -1129,6 +1129,27 @@ class AppLocalizationsZh extends AppLocalizations {
   String get drawerHistory => '历史';
 
   @override
+  String get memoFoldersTitle => '备忘录夹';
+
+  @override
+  String get memoFoldersDefault => '默认备忘录夹';
+
+  @override
+  String get memoFoldersNewFolder => '新建备忘录夹';
+
+  @override
+  String get memoFoldersDuplicateName => '已存在同名备忘录夹';
+
+  @override
+  String get memoFoldersDeleteConfirmTitle => '删除该备忘录夹？';
+
+  @override
+  String get memoFoldersDeleteConfirmBody => '夹内便签将自动挪回默认备忘录夹，不会丢失任何便签。';
+
+  @override
+  String get memoFoldersMoveToTitle => '移动到备忘录夹';
+
+  @override
   String get setupAutoConfigureTitle => '你想如何进行？';
 
   @override
@@ -2466,6 +2487,27 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get drawerHistory => '历史';
+
+  @override
+  String get memoFoldersTitle => '备忘录夹';
+
+  @override
+  String get memoFoldersDefault => '默认备忘录夹';
+
+  @override
+  String get memoFoldersNewFolder => '新建备忘录夹';
+
+  @override
+  String get memoFoldersDuplicateName => '已存在同名备忘录夹';
+
+  @override
+  String get memoFoldersDeleteConfirmTitle => '删除该备忘录夹？';
+
+  @override
+  String get memoFoldersDeleteConfirmBody => '夹内便签将自动挪回默认备忘录夹，不会丢失任何便签。';
+
+  @override
+  String get memoFoldersMoveToTitle => '移动到备忘录夹';
 
   @override
   String get setupAutoConfigureTitle => '你想如何进行？';

@@ -18,6 +18,7 @@ import 'package:gitjournal/logger/logger.dart';
 import 'package:gitjournal/repository.dart';
 import 'package:gitjournal/screens/error_screen.dart';
 import 'package:gitjournal/screens/home_screen.dart';
+import 'package:gitjournal/screens/memo_folders_screen.dart';
 import 'package:gitjournal/screens/onboarding_screens.dart';
 import 'package:gitjournal/screens/tag_listing.dart';
 import 'package:gitjournal/settings/app_config.dart';
@@ -33,6 +34,7 @@ class AppRoute {
   static const all = [
     OnBoardingScreen.routePath,
     FolderListingScreen.routePath,
+    MemoFoldersScreen.routePath,
     TagListingScreen.routePath,
     SettingsScreen.routePath,
     LoginPage.routePath,
@@ -56,14 +58,9 @@ class AppRouter {
   });
 
   String initialRoute() {
-    var route = '/';
-    if (!appConfig.onBoardingCompleted) {
-      route = OnBoardingScreen.routePath;
-    }
-    if (settings.homeScreen == SettingsHomeScreen.AllFolders) {
-      route = FolderListingScreen.routePath;
-    }
-    return route;
+    // Straight to the note card wall - onboarding is skipped (single user
+    // app) and the home screen is fixed.
+    return '/';
   }
 
   Route<dynamic> generateRoute(
@@ -119,6 +116,8 @@ class AppRouter {
         return HomeScreen();
       case FolderListingScreen.routePath:
         return FolderListingScreen();
+      case MemoFoldersScreen.routePath:
+        return const MemoFoldersScreen();
       case TagListingScreen.routePath:
         return const TagListingScreen();
       case SettingsScreen.routePath:

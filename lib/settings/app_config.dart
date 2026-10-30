@@ -41,8 +41,13 @@ class AppConfig extends ChangeNotifier {
   // safely fall back to the plain text editor automatically.
   var richMarkdownEditor = true;
 
+  // User created memo folders, as repo relative paths (repo root direct
+  // children only). The physical directory is created lazily when the first
+  // note is written into it.
+  var memoFolders = <String>[];
+
   void load(SharedPreferences pref) {
-    onBoardingCompleted = pref.getBool("onBoardingCompleted") ?? false;
+    onBoardingCompleted = pref.getBool("onBoardingCompleted") ?? true;
 
     collectCrashReports =
         pref.getBool("collectCrashReports") ?? collectCrashReports;
@@ -64,6 +69,7 @@ class AppConfig extends ChangeNotifier {
     livePreview = pref.getBool("livePreview") ?? livePreview;
     richMarkdownEditor =
         pref.getBool("richMarkdownEditor") ?? richMarkdownEditor;
+    memoFolders = pref.getStringList("memoFolders") ?? memoFolders;
   }
 
   Future<void> save() async {
@@ -94,6 +100,12 @@ class AppConfig extends ChangeNotifier {
     _setBool(pref, "richMarkdownEditor", richMarkdownEditor,
         defaultSet.richMarkdownEditor);
 
+    if (memoFolders.isEmpty) {
+      await pref.remove("memoFolders");
+    } else {
+      await pref.setStringList("memoFolders", memoFolders);
+    }
+
     pref.setInt("appSettingsVersion", version);
 
     notifyListeners();
@@ -111,6 +123,7 @@ class AppConfig extends ChangeNotifier {
       'experimentalAccounts': experimentalAccounts.toString(),
       'experimentalTagAutoCompletion': experimentalTagAutoCompletion.toString(),
       'livePreview': livePreview.toString(),
+      'memoFolders': memoFolders.toString(),
     };
   }
 
