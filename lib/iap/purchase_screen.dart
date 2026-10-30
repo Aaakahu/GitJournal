@@ -55,8 +55,11 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
   @override
   Widget build(BuildContext context) {
     // ignore: deprecated_member_use
-    return WillPopScope(
-      onWillPop: _onWillPop,
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) logEvent(Event.PurchaseScreenClose);
+      },
       child: Scaffold(
         appBar: AppBar(
           title: Text(context.loc.purchaseScreenTitle),
@@ -102,11 +105,6 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
         ),
       ],
     );
-  }
-
-  Future<bool> _onWillPop() async {
-    logEvent(Event.PurchaseScreenClose);
-    return true;
   }
 }
 

@@ -921,7 +921,7 @@ packages:
     source: git
     version: "0.0.1"
   image:
-    dependency: transitive
+    dependency: "direct dev"
     description:
       name: image
       sha256: "8e9d133755c3e84c73288363e6343157c383a0c6c56fc51afcc5d4d7180306d6"

@@ -24,7 +24,7 @@ class Themes {
   }
 
   static const _pageTransitions = PageTransitionsTheme(builders: {
-    TargetPlatform.android: ZoomPageTransitionsBuilder(),
+    TargetPlatform.android: PredictiveBackPageTransitionsBuilder(),
     TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
     TargetPlatform.linux: CupertinoPageTransitionsBuilder(),
     TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
@@ -125,6 +125,8 @@ class Themes {
     final t =
         brightness == Brightness.light ? GlassTokens.light : GlassTokens.dark;
     final onPrimary = brightness == Brightness.light ? Colors.white : t.base;
+    // Ink on ledger yellow reads far better than white on yellow.
+    final onAccent = brightness == Brightness.light ? t.primary : t.base;
 
     return ThemeData(
       brightness: brightness,
@@ -138,7 +140,7 @@ class Themes {
         primary: t.primary,
         onPrimary: onPrimary,
         secondary: t.accent,
-        onSecondary: onPrimary,
+        onSecondary: onAccent,
         error: t.destructive,
         onError: Colors.white,
         surface: Color.alphaBlend(t.card, t.base),
@@ -194,8 +196,7 @@ class Themes {
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: t.accent,
-        foregroundColor:
-            brightness == Brightness.light ? Colors.white : t.base,
+        foregroundColor: onAccent,
       ),
       checkboxTheme: CheckboxThemeData(
         fillColor: WidgetStateProperty.resolveWith<Color?>(

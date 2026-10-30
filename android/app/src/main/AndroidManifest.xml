@@ -19,6 +19,7 @@ SPDX-License-Identifier: Apache-2.0
         tools:replace="android:label"
         android:label="@string/app_name"
         android:icon="@mipmap/launcher_icon"
+        android:enableOnBackInvokedCallback="true"
         android:requestLegacyExternalStorage="true">
         <activity
             android:name=".MainActivity"

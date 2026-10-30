@@ -250,13 +250,21 @@ class NoteEditorState extends State<NoteEditor>
 
   @override
   Widget build(BuildContext context) {
-    // ignore: deprecated_member_use
-    return WillPopScope(
-      onWillPop: () async {
+    // Migrated from WillPopScope for Android predictive back
+    // (enableOnBackInvokedCallback): system back saves before popping.
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
         var note = _getNoteFromEditor();
-        if (note == null) return true;
+        if (note == null) {
+          if (context.mounted) Navigator.of(context).pop();
+          return;
+        }
         var savedNote = await _saveNote(note);
-        return savedNote;
+        if (savedNote && context.mounted) {
+          Navigator.of(context).pop();
+        }
       },
       child: _getEditor(),
     );

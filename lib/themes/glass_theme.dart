@@ -14,16 +14,16 @@ import 'package:flutter/material.dart';
 /// solid-glass tokens for one brightness.
 @immutable
 class GlassTokens extends ThemeExtension<GlassTokens> {
-  /// Scaffold base color (light #e4e6ea / dark #0d0d0d).
+  /// Scaffold base color (light #faf9f0 / dark #0d0d0d).
   final Color base;
 
-  /// Panel layer - rgba(248,249,251,.44) / rgba(255,255,255,.045).
+  /// Panel layer - rgba(255,252,245,.50) / rgba(255,255,255,.045).
   final Color panel;
 
-  /// Card layer - rgba(250,250,252,.60) / rgba(79,79,82,.46).
+  /// Card layer - rgba(255,255,255,.72) / rgba(79,79,82,.46).
   final Color card;
 
-  /// Popover layer (menus, dialogs) - rgba(251,251,253,.96) / rgba(56,56,58,.96).
+  /// Popover layer (menus, dialogs) - rgba(255,255,255,.97) / rgba(56,56,58,.96).
   final Color popover;
 
   /// Rim light along the top edge (light 90% white / dark 16% white).
@@ -44,7 +44,7 @@ class GlassTokens extends ThemeExtension<GlassTokens> {
   /// Ink primary (light #1a1a1a / dark #f0f0f0).
   final Color primary;
 
-  /// Brand teal (light #10b981 / dark #34d399).
+  /// Brand ledger yellow (light #f5b301 / dark #ffd54f).
   final Color accent;
 
   /// Destructive #dc2626.
@@ -74,17 +74,17 @@ class GlassTokens extends ThemeExtension<GlassTokens> {
   });
 
   static const light = GlassTokens(
-    base: Color(0xFFe4e6ea),
-    panel: Color(0x70F8F9FB), // rgba(248,249,251,.44)
-    card: Color(0x99FAFAFC), // rgba(250,250,252,.60)
-    popover: Color(0xF5FBFBFD), // rgba(251,251,253,.96)
+    base: Color(0xFFfaf9f0), // 暖白
+    panel: Color(0x80FFFCF5), // rgba(255,252,245,.50)
+    card: Color(0xB8FFFFFF), // rgba(255,255,255,.72)
+    popover: Color(0xF7FFFFFF), // rgba(255,255,255,.97)
     rim: Color(0xE6FFFFFF), // 90% white
     inner: Color(0x59FFFFFF), // 35% white
     edge: Color(0x212A3521), // rgba(35,42,53,.13)
     shade: Color(0x471C212C), // rgba(28,33,44,.28)
     contact: Color(0x2E000000), // rgba(0,0,0,.18)
     primary: Color(0xFF1a1a1a),
-    accent: Color(0xFF10b981),
+    accent: Color(0xFFF5B301), // 账本黄
     destructive: Color(0xFFdc2626),
     foreground: Color(0xFF0d0d0d),
     blurSigma: 13.0,
@@ -101,7 +101,7 @@ class GlassTokens extends ThemeExtension<GlassTokens> {
     shade: Color(0x99000000), // rgba(0,0,0,.60)
     contact: Color(0x2E000000), // rgba(0,0,0,.18)
     primary: Color(0xFFf0f0f0),
-    accent: Color(0xFF34d399),
+    accent: Color(0xFFFFD54F), // 亮黄
     destructive: Color(0xFFdc2626),
     foreground: Color(0xFFfafafa),
     blurSigma: 13.0,
@@ -320,8 +320,8 @@ class GlassCard extends StatelessWidget {
 }
 
 /// Ambient light backdrop for the light glass theme: base color plus three
-/// radial glows (teal 7% / blue 11% / teal 4%). The dark theme does not add
-/// any ambient light - [GlassTokens.dark].base is used as-is.
+/// radial glows (yellow 8% / warm white 12% / yellow 4%). The dark theme does
+/// not add any ambient light - [GlassTokens.dark].base is used as-is.
 class GlassBackground extends StatelessWidget {
   final Widget? child;
 
@@ -337,9 +337,9 @@ class GlassBackground extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          _glow(tokens.accent.withAlpha(18), const Alignment(-0.7, -0.8), 1.0),
+          _glow(tokens.accent.withAlpha(20), const Alignment(-0.7, -0.8), 1.0),
           _glow(
-              const Color(0xFF3b82f6).withAlpha(28), // 蓝 11%
+              const Color(0xFFFFFDF2).withAlpha(31), // 暖白 12%
               const Alignment(0.8, -0.6),
               0.9),
           _glow(tokens.accent.withAlpha(10), const Alignment(-0.2, 1.0), 0.8),
