@@ -180,7 +180,7 @@ class MarkdownEditorState extends State<MarkdownEditor>
         imageDir: p.join(_note.repoPath, _note.parent.folderPath),
         autofocus: widget.editMode,
         onChanged: _richTextChanged,
-        onImageResized: _onRichImageResized,
+        onImageWidthChange: _onRichImageWidthChange,
       );
     } else {
       bodyEditor = NoteBodyEditor(
@@ -246,7 +246,7 @@ class MarkdownEditorState extends State<MarkdownEditor>
                 note: previewNote,
                 onNoteTapped: (note) =>
                     openNoteEditor(context, note, _note.parent),
-                onImageResized: _onImageResized,
+                onImageWidthChange: _onImageMarkupToggled,
               ),
             ),
           ),
@@ -334,15 +334,18 @@ class MarkdownEditorState extends State<MarkdownEditor>
     notifyListeners();
   }
 
-  /// Rewrites the `|width` suffix of the imageIndex-th image markup in the
-  /// body. The document-order index of the image node matches the order of
+  /// Toggles the `|240` thumbnail suffix of the imageIndex-th image markup in
+  /// the body. The document-order index of the image node matches the order of
   /// the image markups in the text because the rich editor is only active
   /// for bodies that round-trip exactly.
-  void _onRichImageResized(int imageIndex, double width) {
+  void _onRichImageWidthChange(int imageIndex) {
+    // Sync any debounced document serialization first, so the markup indexes
+    // match the document the user sees.
+    _richBodyEditorKey.currentState?.flushPendingWrite();
     var matches = imageMarkupRegex.allMatches(_textController.text).toList();
     if (imageIndex >= matches.length) return;
     var match = matches[imageIndex];
-    _onImageResized(match.start, match.end, width);
+    _onImageMarkupToggled(match.start, match.end);
   }
 
   void _noteTextChanged() {
@@ -395,6 +398,24 @@ class MarkdownEditorState extends State<MarkdownEditor>
   Future<void> addImage(String filePath) async {
     try {
       var image = await core.Image.copyIntoFs(_note.parent, filePath);
+
+      if (_useRichEditor) {
+        // The rich editor owns the caret: insert at the document layer.
+        // Writing into the hidden text controller would insert at the stale
+        // selection left over from the last serialization and race the
+        // "external change" document reload - images needed several tries.
+        var relativeImagePath =
+            p.relative(image.filePath, from: _note.parent.folderPath);
+        if (!relativeImagePath.startsWith('.')) {
+          relativeImagePath = './$relativeImagePath';
+        }
+        _richBodyEditorKey.currentState?.insertImageNode(relativeImagePath);
+        setState(() {
+          _noteModified = true;
+        });
+        return;
+      }
+
       var ts = insertImage(
         TextEditorState.fromValue(_textController.value),
         image,
@@ -413,16 +434,20 @@ class MarkdownEditorState extends State<MarkdownEditor>
   @override
   bool get noteModified => _noteModified;
 
-  // Writes the new image width back into the body by replacing exactly the
-  // markup of the resized image. Not tracked by the undo stack - resizing
-  // an image isn't undoable.
-  void _onImageResized(int start, int end, double width) {
+  // Rewrites exactly the image markup between [start] and [end]: a markup
+  // with a `|width` suffix loses it (full width), a plain one gains `|240`
+  // (thumbnail). Not tracked by the undo stack - toggling an image size
+  // isn't undoable.
+  void _onImageMarkupToggled(int start, int end) {
     var text = _textController.text;
     if (start < 0 || end > text.length || start >= end) return;
 
     var markup = text.substring(start, end);
-    var newMarkup = imageMarkupWithWidth(markup, width.round());
-    if (newMarkup == null) return;
+    var match = imageMarkupRegex.firstMatch(markup);
+    if (match == null) return;
+    var newMarkup = match.group(3) != null
+        ? '![${match.group(1)}](${match.group(2)})'
+        : '![${match.group(1)}](${match.group(2)}|$gjImageThumbnailWidth)';
 
     int adjustOffset(int offset) {
       if (offset <= start) return offset;

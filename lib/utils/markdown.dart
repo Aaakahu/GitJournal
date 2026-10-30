@@ -13,6 +13,11 @@ import 'dart:core';
 final RegExp imageMarkupRegex =
     RegExp(r'!\[([^\]]*)\]\(([^()\s|]+)(?:\|(\d+))?\)');
 
+/// The width in logical pixels a plain image markup gets when it is toggled
+/// to thumbnail size (`|240` suffix). Matches what desktop Obsidian shows
+/// for `![[name|240]]` after inbox-sync.
+const int gjImageThumbnailWidth = 240;
+
 /// Splits the rendered image URL into its path and the `|width` suffix.
 /// The `|` survives the markdown parser percent-encoded as `%7C`.
 final RegExp imageUrlWidthSuffixRegex =
@@ -28,14 +33,6 @@ String? firstLocalImagePath(String body) {
     }
   }
   return null;
-}
-
-/// Rewrites the `|width` suffix of an image [markup] with [newWidth].
-/// Returns null if the [markup] isn't an image markup.
-String? imageMarkupWithWidth(String markup, int newWidth) {
-  var match = imageMarkupRegex.firstMatch(markup);
-  if (match == null) return null;
-  return '![${match.group(1)}](${match.group(2)}|$newWidth)';
 }
 
 String stripMarkdownFormatting(String markdown) {

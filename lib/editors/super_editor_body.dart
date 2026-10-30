@@ -33,10 +33,9 @@ class SuperEditorBody extends StatefulWidget {
   final bool autofocus;
   final VoidCallback onChanged;
 
-  /// Called with the document-order index of the resized image node and the
-  /// new width in logical pixels. The parent rewrites the `|width` suffix in
-  /// the markdown text.
-  final void Function(int imageIndex, double newWidth)? onImageResized;
+  /// Called with the document-order index of the tapped image node. The
+  /// parent toggles the `|240` thumbnail suffix in the markdown text.
+  final void Function(int imageIndex)? onImageWidthChange;
 
   const SuperEditorBody({
     super.key,
@@ -44,7 +43,7 @@ class SuperEditorBody extends StatefulWidget {
     required this.imageDir,
     required this.autofocus,
     required this.onChanged,
-    this.onImageResized,
+    this.onImageWidthChange,
   });
 
   @override
@@ -127,6 +126,83 @@ class SuperEditorBodyState extends State<SuperEditorBody> {
     _writeBack(deferParentCallback: true);
   }
 
+  /// Inserts an image node for [relativeImagePath] at the current caret and
+  /// moves the caret after it. This is the rich editor's image insertion
+  /// path: it edits the document directly instead of going through the text
+  /// controller, whose selection is a stale serialization artifact and whose
+  /// "external change" reload raced the 300ms write-back (images needed
+  /// several attempts to stick).
+  void insertImageNode(String relativeImagePath) {
+    final imageNode = ImageNode(
+      id: Editor.createNodeId(),
+      imageUrl: relativeImagePath,
+      altText: 'Image',
+    );
+
+    final selection = _composer.selection;
+    final anchorId = selection?.extent.nodeId;
+    final anchor = anchorId != null
+        ? _document.getNodeById(anchorId)
+        : _document.nodeCount > 0
+            ? _document.getNodeAt(_document.nodeCount - 1)
+            : null;
+
+    if (selection != null &&
+        anchor != null &&
+        selection.base.nodeId == selection.extent.nodeId &&
+        anchor is ParagraphNode) {
+      // Stock caret insertion: splits the paragraph when needed, moves the
+      // caret onto a fresh paragraph below the image.
+      _editor.execute([InsertNodeAtCaretRequest(node: imageNode)]);
+      return;
+    }
+
+    // Fallback: the caret API is a no-op without a selection anchored inside
+    // a single paragraph (nothing focused yet, an image selected, ...).
+    // Insert after the anchor node (or at the end) and park the caret on a
+    // fresh paragraph below the image so further inserts keep working.
+    final requests = <EditRequest>[];
+    DocumentSelection caretTarget;
+    if (anchor == null) {
+      final below = _emptyParagraph();
+      requests
+        ..add(InsertNodeAtIndexRequest(nodeIndex: 0, newNode: imageNode))
+        ..add(InsertNodeAtIndexRequest(nodeIndex: 1, newNode: below));
+      caretTarget = DocumentSelection.collapsed(
+        position: DocumentPosition(
+          nodeId: below.id,
+          nodePosition: below.endPosition,
+        ),
+      );
+    } else {
+      final below = _emptyParagraph();
+      requests
+        ..add(InsertNodeAfterNodeRequest(
+          existingNodeId: anchor.id,
+          newNode: imageNode,
+        ))
+        ..add(InsertNodeAfterNodeRequest(
+          existingNodeId: imageNode.id,
+          newNode: below,
+        ));
+      caretTarget = DocumentSelection.collapsed(
+        position: DocumentPosition(
+          nodeId: below.id,
+          nodePosition: below.endPosition,
+        ),
+      );
+    }
+    requests.add(ChangeSelectionRequest(
+      caretTarget,
+      SelectionChangeType.insertContent,
+      SelectionReason.userInteraction,
+    ));
+    _editor.execute(requests);
+  }
+
+  ParagraphNode _emptyParagraph() =>
+      ParagraphNode(id: Editor.createNodeId(), text: AttributedText());
+
   void _onEditorChanged(List<EditEvent> changeLog) {
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 300), _writeBack);
@@ -171,7 +247,7 @@ class SuperEditorBodyState extends State<SuperEditorBody> {
 
     return GjImageScope(
       imageDir: widget.imageDir,
-      onImageResizeEnd: _onImageResizeEnd,
+      onImageWidthChange: _onImageWidthChange,
       child: SuperEditor(
         editor: _editor,
         autofocus: widget.autofocus,
@@ -187,13 +263,13 @@ class SuperEditorBodyState extends State<SuperEditorBody> {
     );
   }
 
-  void _onImageResizeEnd(String nodeId, double newWidth) {
+  void _onImageWidthChange(String nodeId) {
     final nodes = _document.toList(growable: false);
     var imageIndex = 0;
     for (final node in nodes) {
       if (node is! ImageNode) continue;
       if (node.id == nodeId) {
-        widget.onImageResized?.call(imageIndex, newWidth);
+        widget.onImageWidthChange?.call(imageIndex);
         return;
       }
       imageIndex++;
@@ -316,12 +392,12 @@ Stylesheet _buildStylesheet(ThemeData theme) {
 /// the super_editor component tree.
 class GjImageScope extends InheritedWidget {
   final String imageDir;
-  final void Function(String nodeId, double newWidth) onImageResizeEnd;
+  final void Function(String nodeId) onImageWidthChange;
 
   const GjImageScope({
     super.key,
     required this.imageDir,
-    required this.onImageResizeEnd,
+    required this.onImageWidthChange,
     required super.child,
   });
 
@@ -338,8 +414,9 @@ class GjImageScope extends InheritedWidget {
 }
 
 /// Renders [ImageNode]s inline in the editor flow: local images from the
-/// note folder (with the `|width` url suffix honored) and a drag handle to
-/// change the width.
+/// note folder with the `|width` url suffix honored. Tapping the image
+/// toggles between full width and thumbnail width (the write-back happens
+/// through [GjImageScope.onImageWidthChange]).
 class GjImageComponentBuilder implements ComponentBuilder {
   const GjImageComponentBuilder();
 
@@ -388,12 +465,8 @@ class GjImageComponent extends StatefulWidget {
 }
 
 class _GjImageComponentState extends State<GjImageComponent> {
-  // Width while the resize handle is being dragged, null otherwise.
-  double? _dragWidth;
-
   @override
   Widget build(BuildContext context) {
-    final scope = GjImageScope.of(context);
     final theme = Theme.of(context);
 
     final match = imageUrlWidthSuffixRegex.firstMatch(widget.imageUrl);
@@ -406,35 +479,24 @@ class _GjImageComponentState extends State<GjImageComponent> {
 
     return LayoutBuilder(builder: (context, constraints) {
       final maxWidth = constraints.maxWidth;
-      final effectiveWidth =
-          (_dragWidth ?? width ?? maxWidth).clamp(40.0, maxWidth);
+      // No `|width` suffix: full width. With suffix: the requested width.
+      final effectiveWidth = (width ?? maxWidth).clamp(40.0, maxWidth);
 
-      Widget image = _buildImage(imagePath, effectiveWidth, theme);
-
-      image = MouseRegion(
-        cursor: SystemMouseCursors.basic,
-        hitTestBehavior: HitTestBehavior.translucent,
-        child: IgnorePointer(
-          // The document gesture system owns taps/drags on the image; only
-          // the resize handle (rendered outside this wrapper) is touchable.
-          child: BoxComponent(
-            key: widget.componentKey,
-            child: Center(
-              child: SizedBox(
-                width: effectiveWidth,
-                child: image,
-              ),
+      // The inner tap recognizer sits deeper in the tree than the document
+      // gesture system's, so it wins the arena: tap toggles thumbnail/full.
+      return BoxComponent(
+        key: widget.componentKey,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () =>
+              GjImageScope.of(context).onImageWidthChange(widget.nodeId),
+          child: Center(
+            child: SizedBox(
+              width: effectiveWidth,
+              child: _buildImage(imagePath, effectiveWidth, theme),
             ),
           ),
         ),
-      );
-
-      return Stack(
-        alignment: AlignmentDirectional.bottomEnd,
-        children: [
-          image,
-          _buildResizeHandle(theme, maxWidth, effectiveWidth, scope),
-        ],
       );
     });
   }
@@ -483,41 +545,6 @@ class _GjImageComponentState extends State<GjImageComponent> {
           Icons.broken_image,
           size: 36,
           color: theme.colorScheme.error,
-        ),
-      ),
-    );
-  }
-
-  /// Drag handle at the bottom right corner, ported from MarkdownImage.
-  Widget _buildResizeHandle(
-      ThemeData theme, double maxWidth, double startWidth, GjImageScope scope) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onHorizontalDragUpdate: (details) {
-        setState(() {
-          final current = _dragWidth ?? startWidth;
-          _dragWidth = (current + details.delta.dx).clamp(40.0, maxWidth);
-        });
-      },
-      onHorizontalDragEnd: (details) {
-        final newWidth = _dragWidth;
-        setState(() => _dragWidth = null);
-        if (newWidth != null) {
-          scope.onImageResizeEnd(widget.nodeId, newWidth);
-        }
-      },
-      child: Container(
-        width: 32.0,
-        height: 32.0,
-        margin: const EdgeInsets.all(4.0),
-        decoration: BoxDecoration(
-          color: theme.scaffoldBackgroundColor.withValues(alpha: 0.8),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(
-          Icons.settings_ethernet,
-          size: 18.0,
-          color: theme.iconTheme.color,
         ),
       ),
     );

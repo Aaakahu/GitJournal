@@ -32,16 +32,16 @@ class MarkdownRenderer extends StatelessWidget {
   final Note note;
   final Func1<Note, void> onNoteTapped;
 
-  /// Called with the [start] and [end] offsets of the resized image's markup
-  /// inside [Note.body] and the new width in logical pixels. When null, no
-  /// resize handle is rendered.
-  final void Function(int start, int end, double width)? onImageResized;
+  /// Called with the [start] and [end] offsets of the tapped image's markup
+  /// inside [Note.body]. The receiver toggles its `|240` thumbnail suffix.
+  /// When null, tapping an image opens the image details page instead.
+  final void Function(int start, int end)? onImageWidthChange;
 
   const MarkdownRenderer({
     super.key,
     required this.note,
     required this.onNoteTapped,
-    this.onImageResized,
+    this.onImageWidthChange,
   });
 
   @override
@@ -92,7 +92,7 @@ class MarkdownRenderer extends StatelessWidget {
     // us map a rendered image back to its exact markup position.
     List<RegExpMatch>? imageMatches;
     var imageIndex = 0;
-    if (onImageResized != null) {
+    if (onImageWidthChange != null) {
       imageMatches = imageMarkupRegex.allMatches(note.body).toList();
     }
 
@@ -145,13 +145,13 @@ class MarkdownRenderer extends StatelessWidget {
           width = double.parse(match.group(2)!);
         }
 
-        void Function(double)? onResizeEnd;
-        if (onImageResized != null && imageMatches != null) {
+        void Function()? onToggleWidth;
+        if (onImageWidthChange != null && imageMatches != null) {
           final i = imageIndex++;
           if (i < imageMatches.length && imageMatches[i].group(2) == imagePath.toString()) {
             final markupMatch = imageMatches[i];
-            onResizeEnd = (newWidth) =>
-                onImageResized!(markupMatch.start, markupMatch.end, newWidth);
+            onToggleWidth = () =>
+                onImageWidthChange!(markupMatch.start, markupMatch.end);
           }
         }
 
@@ -160,7 +160,7 @@ class MarkdownRenderer extends StatelessWidget {
           width: width,
           titel: title,
           altText: alt,
-          onResizeEnd: onResizeEnd,
+          onToggleWidth: onToggleWidth,
         );
       },
       extensionSet: markdownExtensions(hardWrapEnabled: settings.hardWrap),

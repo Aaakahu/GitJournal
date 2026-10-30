@@ -26,13 +26,12 @@ class MarkdownImage extends StatefulWidget {
   // FIXME: Avoid using dynamic!
   final Future<dynamic> data;
 
-  /// When set, a drag handle is rendered at the bottom right corner which
-  /// lets the user change the image width. Called with the final width
-  /// (in logical pixels) once the drag ends.
-  final void Function(double width)? onResizeEnd;
+  /// When set, tapping the image toggles its width (thumbnail <-> full).
+  /// When null, tapping opens the image details page.
+  final VoidCallback? onToggleWidth;
 
   const MarkdownImage._(this.data, this.width, this.height, String? altText,
-      String? tooltip, {this.onResizeEnd})
+      String? tooltip, {this.onToggleWidth})
       : altText = altText ?? "",
         tooltip = tooltip ?? "";
 
@@ -41,7 +40,7 @@ class MarkdownImage extends StatefulWidget {
       double? height,
       String? altText,
       String? titel,
-      void Function(double width)? onResizeEnd}) {
+      void Function()? onToggleWidth}) {
     final file = ((uri.isScheme("http") || uri.isScheme("https"))
         ? DefaultCacheManager().getSingleFile(uri.toString())
         : Future.sync(() =>
@@ -51,7 +50,7 @@ class MarkdownImage extends StatefulWidget {
         (value) => value.path.endsWith(".svg") ? value.readAsString() : file);
 
     return MarkdownImage._(data, width, height, altText, titel,
-        onResizeEnd: onResizeEnd);
+        onToggleWidth: onToggleWidth);
   }
 
   @override
@@ -59,15 +58,12 @@ class MarkdownImage extends StatefulWidget {
 }
 
 class _MarkdownImageState extends State<MarkdownImage> {
-  // The width while the resize handle is being dragged, null otherwise
-  double? _dragWidth;
-
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<MarkdownRendererConfig>();
     final theme = Theme.of(context);
     final dark = theme.brightness == Brightness.dark;
-    final width = _dragWidth ?? widget.width;
+    final width = widget.width;
 
     // Test for override tags in AltText/Tooltip
     ThemeOverride override = ThemeOverride.None;
@@ -181,33 +177,24 @@ class _MarkdownImageState extends State<MarkdownImage> {
                 }
 
                 Widget image = GestureDetector(
+                  behavior: widget.onToggleWidth != null
+                      ? HitTestBehavior.opaque
+                      : HitTestBehavior.deferToChild,
+                  onTap: widget.onToggleWidth ??
+                      () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ImageDetails(
+                              im as ThemableImage,
+                              captionText(
+                                  context, widget.altText, widget.tooltip),
+                            ),
+                          ),
+                        );
+                      },
                   child: im,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ImageDetails(
-                          im as ThemableImage,
-                          captionText(context, widget.altText, widget.tooltip),
-                        ),
-                      ),
-                    );
-                  },
                 );
-
-                if (widget.onResizeEnd != null) {
-                  image = Stack(
-                    alignment: AlignmentDirectional.bottomEnd,
-                    children: [
-                      image,
-                      _buildResizeHandle(
-                        settings: settings,
-                        theme: theme,
-                        maxWidth: constraints.maxWidth,
-                      ),
-                    ],
-                  );
-                }
 
                 return image;
               }
@@ -235,43 +222,6 @@ class _MarkdownImageState extends State<MarkdownImage> {
         }
         return image;
       },
-    );
-  }
-
-  Widget _buildResizeHandle({
-    required MarkdownRendererConfig settings,
-    required ThemeData theme,
-    required double maxWidth,
-  }) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onHorizontalDragUpdate: (details) {
-        setState(() {
-          var startWidth = _dragWidth ?? widget.width ?? maxWidth;
-          _dragWidth = (startWidth + details.delta.dx).clamp(40.0, maxWidth);
-        });
-      },
-      onHorizontalDragEnd: (details) {
-        final newWidth = _dragWidth;
-        setState(() => _dragWidth = null);
-        if (newWidth != null) {
-          widget.onResizeEnd!(newWidth);
-        }
-      },
-      child: Container(
-        width: 32.0,
-        height: 32.0,
-        margin: const EdgeInsets.all(4.0),
-        decoration: BoxDecoration(
-          color: getOverlayBackgroundColor(settings, theme),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(
-          Icons.settings_ethernet,
-          size: 18.0,
-          color: theme.iconTheme.color,
-        ),
-      ),
     );
   }
 }

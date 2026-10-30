@@ -84,24 +84,4 @@ void main() {
       expect(match.group(2), '600');
     });
   });
-
-  group('ImageMarkupWithWidth', () {
-    test('Adds width to plain markup', () {
-      expect(
-        imageMarkupWithWidth('![Image](./abc.jpg)', 600),
-        '![Image](./abc.jpg|600)',
-      );
-    });
-
-    test('Replaces existing width', () {
-      expect(
-        imageMarkupWithWidth('![](./abc.jpg|12)', 348),
-        '![](./abc.jpg|348)',
-      );
-    });
-
-    test('Non markup returns null', () {
-      expect(imageMarkupWithWidth('hello world)', 600), null);
-    });
-  });
 }

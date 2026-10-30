@@ -14,6 +14,7 @@ import 'package:gitjournal/core/notes/note.dart';
 import 'package:gitjournal/editors/common.dart';
 import 'package:gitjournal/editors/markdown_editor.dart';
 import 'package:gitjournal/editors/note_body_editor.dart';
+import 'package:gitjournal/editors/super_editor_body.dart';
 import 'package:gitjournal/l10n.dart';
 import 'package:gitjournal/settings/app_config.dart';
 import 'package:gitjournal/settings/settings.dart';
@@ -134,6 +135,79 @@ void main() {
     expect(find.byType(NoteBodyEditor), findsOneWidget);
     expect(find.byType(SuperEditor), findsNothing);
     expect(find.textContaining('| a | b |'), findsOneWidget);
+  });
+
+  testWidgets('insertImageNode thrice inserts three images (regression: '
+      'insertion needed several attempts)', (tester) async {
+    var controller = TextEditingController(text: "Hello World");
+    var bodyKey = GlobalKey<SuperEditorBodyState>();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          // super_editor's sliver tree must hang directly off a
+          // CustomScrollView (it is itself a sliver).
+          body: CustomScrollView(
+            slivers: [
+              SliverPadding(
+                padding: const EdgeInsets.all(16),
+                sliver: SuperEditorBody(
+                  key: bodyKey,
+                  textController: controller,
+                  imageDir: '/gj_test_images',
+                  autofocus: false,
+                  onChanged: () {},
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final state = bodyKey.currentState!;
+    state.insertImageNode('./a.jpg');
+    await tester.pump();
+    state.insertImageNode('./b.jpg');
+    await tester.pump();
+    state.insertImageNode('./c.jpg');
+    state.flushPendingWrite();
+    await tester.pump();
+
+    final editor = tester.widget<SuperEditor>(find.byType(SuperEditor));
+    final images =
+        editor.editor.document.toList().whereType<ImageNode>().toList();
+    expect(images.map((n) => n.imageUrl),
+        ['./a.jpg', './b.jpg', './c.jpg']);
+
+    // The serialized write-back contains all three markups.
+    expect(controller.text.contains('![Image](./a.jpg)'), isTrue);
+    expect(controller.text.contains('![Image](./b.jpg)'), isTrue);
+    expect(controller.text.contains('![Image](./c.jpg)'), isTrue);
+  });
+
+  testWidgets('Tapping an image toggles the |240 thumbnail suffix',
+      (tester) async {
+    var note = buildNote("Hello\n\n![x](./a.jpg)\n\nBye", title: "Img");
+
+    var errors = await pumpEditor(tester, note);
+    expect(errors, isEmpty);
+    expect(find.byType(GjImageComponent), findsOneWidget);
+
+    final editorState =
+        tester.state<MarkdownEditorState>(find.byType(MarkdownEditor));
+
+    await tester.tap(find.byType(GjImageComponent));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(editorState.getNote().body, "Hello\n\n![x](./a.jpg|240)\n\nBye");
+
+    // The document reloaded with the suffix, so the component is new: tap
+    // again to go back to full width.
+    expect(find.byType(GjImageComponent), findsOneWidget);
+    await tester.tap(find.byType(GjImageComponent));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(editorState.getNote().body, "Hello\n\n![x](./a.jpg)\n\nBye");
   });
 }
 
