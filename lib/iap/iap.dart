@@ -7,7 +7,6 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart' as foundation;
 import 'package:gitjournal/logger/logger.dart';
 import 'package:gitjournal/settings/app_config.dart';
 import 'package:http/http.dart' as http;
@@ -16,23 +15,20 @@ import 'package:universal_io/io.dart' show Platform;
 
 class GitJournalInAppPurchases {
   static Future<void> confirmProPurchaseBoot() async {
-    confirmPendingPurchases();
-
+    // GPL fork unlock policy: this build is distributed as a sideloaded APK
+    // without a Play Billing channel. The original flow would call
+    // restorePurchases(), which always fails here and then switches Pro off
+    // (and any proMode=false stored on the device would stick). So Pro is
+    // forced on unconditionally, before the validateProMode early exit.
     var appConfig = AppConfig.instance;
-    if (!appConfig.validateProMode) {
-      return;
+    if (!appConfig.proMode || appConfig.validateProMode) {
+      appConfig.proMode = true;
+      appConfig.validateProMode = false;
+      appConfig.save();
     }
 
-    if (appConfig.proMode) {
-      Log.i("confirmProPurchaseBoot: Already in ProMode");
-      return;
-    }
-    if (foundation.kDebugMode) {
-      Log.d("Ignoring IAP pro check - debug mode");
-      return;
-    }
-
-    restorePurchases();
+    confirmPendingPurchases();
+    return;
   }
 
   static Future<void> restorePurchases() async {
