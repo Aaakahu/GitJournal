@@ -16,6 +16,7 @@ import 'package:gitjournal/editors/heuristics.dart';
 import 'package:gitjournal/editors/markdown_toolbar.dart';
 import 'package:gitjournal/editors/note_body_editor.dart';
 import 'package:gitjournal/editors/note_title_editor.dart';
+import 'package:gitjournal/editors/super_editor_body.dart';
 import 'package:gitjournal/editors/undo_redo.dart';
 import 'package:gitjournal/editors/utils/disposable_change_notifier.dart';
 import 'package:gitjournal/error_reporting.dart';
@@ -23,9 +24,11 @@ import 'package:gitjournal/folder_views/common.dart';
 import 'package:gitjournal/l10n.dart';
 import 'package:gitjournal/logger/logger.dart';
 import 'package:gitjournal/markdown/markdown_renderer.dart';
+import 'package:gitjournal/markdown/rich_editor_safety.dart';
 import 'package:gitjournal/settings/app_config.dart';
 import 'package:gitjournal/utils/markdown.dart';
 import 'package:gitjournal/utils/utils.dart';
+import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 
 import 'controllers/rich_text_controller.dart';
@@ -74,6 +77,16 @@ class MarkdownEditorState extends State<MarkdownEditor>
   late ScrollController _scrollController;
 
   final _bodyEditorKey = GlobalKey();
+  final _richBodyEditorKey = GlobalKey<SuperEditorBodyState>();
+
+  /// Whether this editor session uses the WYSIWYG (super_editor) body.
+  /// Decided once when the note is opened - notes that can't round-trip
+  /// safely fall back to the plain text editor.
+  late final bool _useRichEditor;
+
+  // Roundtrip check result cache, so it runs at most once per body content.
+  String? _roundtripCheckedBody;
+  bool _roundtripStable = false;
 
   @override
   void initState() {
@@ -97,6 +110,20 @@ class MarkdownEditorState extends State<MarkdownEditor>
     _undoRedoStack = UndoRedoStack();
 
     _textController.addListener(_textControllerChanged);
+
+    _useRichEditor =
+        AppConfig.instance.richMarkdownEditor && _isSafeForRichEditor(_note.body);
+  }
+
+  bool _isSafeForRichEditor(String body) {
+    if (RichEditorSafety.hasUnsafeMarkdown(body)) {
+      return false;
+    }
+    if (_roundtripCheckedBody != body) {
+      _roundtripCheckedBody = body;
+      _roundtripStable = RichEditorSafety.isRoundtripStable(body);
+    }
+    return _roundtripStable;
   }
 
   // Rebuild to refresh the live preview when the text changes
@@ -143,6 +170,27 @@ class MarkdownEditorState extends State<MarkdownEditor>
 
   @override
   Widget build(BuildContext context) {
+    var appConfig = context.watch<AppConfig>();
+
+    Widget bodyEditor;
+    if (_useRichEditor) {
+      bodyEditor = SuperEditorBody(
+        key: _richBodyEditorKey,
+        textController: _textController,
+        imageDir: p.join(_note.repoPath, _note.parent.folderPath),
+        autofocus: widget.editMode,
+        onChanged: _richTextChanged,
+        onImageResized: _onRichImageResized,
+      );
+    } else {
+      bodyEditor = NoteBodyEditor(
+        key: _bodyEditorKey,
+        textController: _textController,
+        autofocus: widget.editMode,
+        onChanged: _noteTextChanged,
+      );
+    }
+
     Widget editor = EditorScrollView(
       scrollController: _scrollController,
       child: Column(
@@ -151,18 +199,14 @@ class MarkdownEditorState extends State<MarkdownEditor>
             _titleTextController,
             _noteTitleTextChanged,
           ),
-          NoteBodyEditor(
-            key: _bodyEditorKey,
-            textController: _textController,
-            autofocus: widget.editMode,
-            onChanged: _noteTextChanged,
-          ),
+          bodyEditor,
         ],
       ),
     );
 
-    var appConfig = context.watch<AppConfig>();
-    if (appConfig.livePreview) {
+    // In the rich editor the body already shows the rendered result, so the
+    // split screen preview makes no sense there.
+    if (!_useRichEditor && appConfig.livePreview) {
       // The preview renders the same text the editor is editing
       var previewNote = _note.copyWith(body: _textController.text);
       editor = Column(
@@ -184,7 +228,7 @@ class MarkdownEditorState extends State<MarkdownEditor>
     }
 
     Widget? markdownToolbar;
-    if (appConfig.experimentalMarkdownToolbar) {
+    if (!_useRichEditor && appConfig.experimentalMarkdownToolbar) {
       markdownToolbar = MarkdownToolBar(
         textController: _textController,
       );
@@ -202,19 +246,21 @@ class MarkdownEditorState extends State<MarkdownEditor>
       onRedoSelected: _redo,
       undoAllowed: _undoRedoStack.undoPossible,
       redoAllowed: _undoRedoStack.redoPossible,
-      extraButton: IconButton(
-        tooltip: context.loc.editorLivePreview,
-        icon: Icon(
-          Icons.vertical_split,
-          color: appConfig.livePreview
-              ? Theme.of(context).colorScheme.secondary
-              : null,
-        ),
-        onPressed: () {
-          appConfig.livePreview = !appConfig.livePreview;
-          appConfig.save();
-        },
-      ),
+      extraButton: _useRichEditor
+          ? null
+          : IconButton(
+              tooltip: context.loc.editorLivePreview,
+              icon: Icon(
+                Icons.vertical_split,
+                color: appConfig.livePreview
+                    ? Theme.of(context).colorScheme.secondary
+                    : null,
+              ),
+              onPressed: () {
+                appConfig.livePreview = !appConfig.livePreview;
+                appConfig.save();
+              },
+            ),
       extraBottomWidget: markdownToolbar,
       findAllowed: true,
     );
@@ -222,11 +268,54 @@ class MarkdownEditorState extends State<MarkdownEditor>
 
   @override
   Note getNote() {
+    // Push any debounced rich editor serialization into the text controller
+    // before reading it, so a save right after typing can't lose content.
+    if (_useRichEditor) {
+      _richBodyEditorKey.currentState?.flushPendingWrite();
+    }
     return _note.copyWith(
       body: _textController.text.trim(),
       title: _titleTextController.text.trim(),
       type: NoteType.Unknown,
     );
+  }
+
+  /// Text updates from the rich editor arrive after the debounced
+  /// serialization. The editor heuristics (bullet auto-continuation etc.)
+  /// operate on raw text and don't apply to the document model, so only the
+  /// modified flag and the undo stack run here.
+  ///
+  /// Known v1 limitations in this mode: undo granularity follows the
+  /// serialization debounce interval, and search highlighting is not
+  /// rendered (find still works on the plain text).
+  void _richTextChanged() {
+    if (_noteModified && !widget.editMode) return;
+
+    var newState = !(widget.editMode && _textController.text.trim().isEmpty);
+    if (newState != _noteModified) {
+      setState(() {
+        _noteModified = newState;
+      });
+    }
+
+    var redraw = _undoRedoStack
+        .textChanged(TextEditorState.fromValue(_textController.value));
+    if (redraw) {
+      setState(() {});
+    }
+
+    notifyListeners();
+  }
+
+  /// Rewrites the `|width` suffix of the imageIndex-th image markup in the
+  /// body. The document-order index of the image node matches the order of
+  /// the image markups in the text because the rich editor is only active
+  /// for bodies that round-trip exactly.
+  void _onRichImageResized(int imageIndex, double width) {
+    var matches = imageMarkupRegex.allMatches(_textController.text).toList();
+    if (imageIndex >= matches.length) return;
+    var match = matches[imageIndex];
+    _onImageResized(match.start, match.end, width);
   }
 
   void _noteTextChanged() {
@@ -344,7 +433,12 @@ class MarkdownEditorState extends State<MarkdownEditor>
   @override
   SearchInfo search(String? text) {
     setState(() {
-      _replaceTextController(highlightText: text);
+      // In the rich editor the body controller is kept untouched: replacing
+      // it would reload the whole document. Search highlighting is a known
+      // v1 limitation there.
+      if (!_useRichEditor) {
+        _replaceTextController(highlightText: text);
+      }
       _titleTextController = buildController(
         text: _titleTextController.text,
         highlightText: text,
@@ -357,6 +451,13 @@ class MarkdownEditorState extends State<MarkdownEditor>
 
   @override
   void scrollToResult(String text, int num) {
+    if (_useRichEditor) {
+      // v1 limitation: there's no mapping between markdown text offsets and
+      // super_editor document positions, so scrolling to a search result is
+      // disabled in the rich editor.
+      return;
+    }
+
     setState(() {
       _replaceTextController(highlightText: text, currentPos: num);
     });

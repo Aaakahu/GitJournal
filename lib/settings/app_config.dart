@@ -37,6 +37,10 @@ class AppConfig extends ChangeNotifier {
   // Live Markdown preview in the editor (split screen)
   var livePreview = false;
 
+  // WYSIWYG markdown editing (super_editor). Notes that can't round-trip
+  // safely fall back to the plain text editor automatically.
+  var richMarkdownEditor = true;
+
   void load(SharedPreferences pref) {
     onBoardingCompleted = pref.getBool("onBoardingCompleted") ?? false;
 
@@ -58,6 +62,8 @@ class AppConfig extends ChangeNotifier {
         pref.getBool("experimentalTagAutoCompletion") ??
             experimentalTagAutoCompletion;
     livePreview = pref.getBool("livePreview") ?? livePreview;
+    richMarkdownEditor =
+        pref.getBool("richMarkdownEditor") ?? richMarkdownEditor;
   }
 
   Future<void> save() async {
@@ -85,6 +91,8 @@ class AppConfig extends ChangeNotifier {
         experimentalTagAutoCompletion,
         defaultSet.experimentalTagAutoCompletion);
     _setBool(pref, "livePreview", livePreview, defaultSet.livePreview);
+    _setBool(pref, "richMarkdownEditor", richMarkdownEditor,
+        defaultSet.richMarkdownEditor);
 
     pref.setInt("appSettingsVersion", version);
 
