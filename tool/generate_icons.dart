@@ -14,6 +14,11 @@ import 'package:image/image.dart' as im;
 const design = 1024; // logical design canvas
 const ss = 4; // supersampling factor (AA via downscale)
 
+/// User-provided master icon (assets/icon/icon.png), upsampled to the
+/// supersampled canvas. When set, paintBg samples this instead of drawing
+/// the procedural gradient — the hand-edited artwork wins.
+im.Image? userMaster;
+
 int col(int r, int g, int b, [int a = 255]) => im.getColor(r, g, b, a);
 
 int over(int dst, int src) {
@@ -76,6 +81,13 @@ int paintBg(double x, double y, Mask mask) {
       break;
     case Mask.full:
       break;
+  }
+  // User-provided artwork takes precedence over the procedural gradient.
+  final um = userMaster;
+  if (um != null) {
+    final sx = ((x / design) * um.width).floor().clamp(0, um.width - 1);
+    final sy = ((y / design) * um.height).floor().clamp(0, um.height - 1);
+    return um.data[sy * um.width + sx];
   }
   return lerpC(
       const [255, 213, 79], const [240, 165, 0], (x + y) / (2 * design));
@@ -254,39 +266,53 @@ void main() {
     'xxxhdpi': 432,
   };
 
-  // 1. Launcher icon (rounded) + in-app logo + notification drawable.
-  var m = renderMaster((x, y) => glassLedger(x, y, Mask.rounded));
-  for (final e in launcherSizes.entries) {
-    writePng(downscale(m, e.value, e.value),
-        '$res/mipmap-${e.key}/launcher_icon.png');
+  // 0. The hand-edited user artwork is the master for everything.
+  final user = im.decodePng(
+      File('$root/assets/icon/icon.png').readAsBytesSync())!;
+  stdout.writeln('user icon: ${user.width}x${user.height}');
+  {
+    final c = user.data[64 * user.width + 512];
+    String hx(int v) => v.toRadixString(16).padLeft(2, '0');
+    stdout.writeln(
+        'bg sample @ (512,64): #${hx(im.getRed(c))}${hx(im.getGreen(c))}${hx(im.getBlue(c))}');
   }
-  writePng(downscale(m, 260, 260), '$res/drawable/icon.png');
-  writePng(downscale(m, design, design), '$root/assets/icon/icon.png');
+  userMaster = im.copyResize(user,
+      width: design * ss,
+      height: design * ss,
+      interpolation: im.Interpolation.average);
 
-  // 2. Adaptive-icon foreground: full-bleed gradient, panel inside safe zone.
-  m = renderMaster((x, y) => glassLedger(x, y, Mask.full));
+  // 1. Launcher icon (rounded) + in-app logo + notification drawable.
+  for (final e in launcherSizes.entries) {
+    writePng(
+        downscale(user, e.value, e.value), '$res/mipmap-${e.key}/launcher_icon.png');
+  }
+  writePng(downscale(user, 260, 260), '$res/drawable/icon.png');
+  writePng(user, '$root/assets/icon/icon.png');
+
+  // 2. Adaptive-icon foreground: full-bleed artwork inside the safe zone.
   for (final e in foregroundSizes.entries) {
     for (final set in const ['ic_book', 'ic_markdown', 'ic_tasks']) {
-      writePng(downscale(m, e.value, e.value),
+      writePng(downscale(userMaster!, e.value, e.value),
           '$res/mipmap-${e.key}/${set}_foreground.png');
     }
   }
 
-  // 3. Quick-action tiles (square + round variants).
+  // 3. Quick-action tiles (square + round variants), glyphs over the
+  //    user artwork (paintBg samples userMaster).
   final tiles = {
     'ic_book': tileBook,
     'ic_markdown': tileMarkdown,
     'ic_tasks': tileTasks,
   };
   for (final t in tiles.entries) {
-    m = renderMaster((x, y) => t.value(x, y, Mask.rounded));
+    final tm = renderMaster((x, y) => t.value(x, y, Mask.rounded));
     for (final e in launcherSizes.entries) {
-      writePng(downscale(m, e.value, e.value),
+      writePng(downscale(tm, e.value, e.value),
           '$res/mipmap-${e.key}/${t.key}.png');
     }
-    m = renderMaster((x, y) => t.value(x, y, Mask.circle));
+    final tmRound = renderMaster((x, y) => t.value(x, y, Mask.circle));
     for (final e in launcherSizes.entries) {
-      writePng(downscale(m, e.value, e.value),
+      writePng(downscale(tmRound, e.value, e.value),
           '$res/mipmap-${e.key}/${t.key}_round.png');
     }
   }
