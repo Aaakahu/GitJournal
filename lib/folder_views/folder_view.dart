@@ -27,7 +27,6 @@ import 'package:gitjournal/utils/utils.dart';
 import 'package:gitjournal/widgets/app_bar_menu_button.dart';
 import 'package:gitjournal/widgets/app_drawer.dart';
 import 'package:gitjournal/widgets/folder_selection_dialog.dart';
-import 'package:gitjournal/widgets/new_note_nav_bar.dart';
 import 'package:gitjournal/widgets/note_delete_dialog.dart';
 import 'package:gitjournal/widgets/note_search_delegate.dart';
 import 'package:gitjournal/widgets/sorting_mode_selection_dialog.dart';
@@ -156,15 +155,12 @@ class _FolderViewState extends State<FolderView> {
     }
 
     var settings = context.watch<Settings>();
-    final showButtomMenuBar = settings.bottomMenuBar;
 
     // So the FAB doesn't hide parts of the last entry
-    if (!showButtomMenuBar) {
-      folderView = SliverPadding(
-        sliver: folderView,
-        padding: const EdgeInsets.fromLTRB(0.0, 0.0, 0.0, 48.0),
-      );
-    }
+    folderView = SliverPadding(
+      sliver: folderView,
+      padding: const EdgeInsets.fromLTRB(0.0, 0.0, 0.0, 48.0),
+    );
 
     var backButton = IconButton(
       icon: const Icon(Icons.arrow_back),
@@ -251,63 +247,25 @@ class _FolderViewState extends State<FolderView> {
   Widget build(BuildContext context) {
     var createButton = FloatingActionButton(
       key: const ValueKey("FAB"),
-      onPressed: () =>
-          _newPost(widget.notesFolder.config.defaultEditor.toEditorType()),
+      // Zero-question new note: always Markdown, lands in the current view's
+      // folder (All Notes view -> repo root, memo folder view -> that folder).
+      onPressed: () => _newPost(EditorType.Markdown),
       child: const Icon(Icons.add),
     );
-
-    var settings = context.watch<Settings>();
-    final showButtomMenuBar = settings.bottomMenuBar;
 
     return Scaffold(
       body: Builder(builder: _buildBody),
       extendBody: true,
       drawer: AppDrawer(),
       floatingActionButton: createButton,
-      floatingActionButtonLocation:
-          showButtomMenuBar ? FloatingActionButtonLocation.endDocked : null,
-      bottomNavigationBar:
-          showButtomMenuBar ? NewNoteNavBar(onPressed: _newPost) : null,
     );
   }
 
   Future<void> _newPost(EditorType editorType) async {
     var settings = context.read<Settings>();
-    var rootFolder = context.read<NotesFolderFS>();
 
-    var folder = widget.notesFolder;
-    var fsFolder = folder.fsFolder as NotesFolderFS;
-    var isVirtualFolder = folder.name != folder.fsFolder!.name;
-
-    if (isVirtualFolder) {
-      fsFolder = getFolderForEditor(settings, rootFolder, editorType);
-    }
-
-    if (editorType == EditorType.Journal) {
-      if (settings.journalEditordefaultNewNoteFolderSpec.isNotEmpty) {
-        var spec = settings.journalEditordefaultNewNoteFolderSpec;
-        fsFolder = rootFolder.getFolderWithSpec(spec) ?? rootFolder;
-
-        if (!isVirtualFolder) {
-          showSnackbar(
-            context,
-            context.loc.settingsEditorsJournalDefaultFolderSelect(spec),
-          );
-        }
-      }
-
-      if (settings.journalEditorSingleNote) {
-        var note = await getTodayJournalEntry(fsFolder.rootFolder);
-        if (note != null) {
-          return openNoteEditor(
-            context,
-            note,
-            fsFolder,
-            editMode: true,
-          );
-        }
-      }
-    }
+    // The new note lands in the folder of the view it was created from.
+    var fsFolder = widget.notesFolder.fsFolder as NotesFolderFS;
 
     var routeType =
         SettingsEditorType.fromEditorType(editorType).toInternalString();
