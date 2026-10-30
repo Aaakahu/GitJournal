@@ -191,18 +191,45 @@ class MarkdownEditorState extends State<MarkdownEditor>
       );
     }
 
-    Widget editor = EditorScrollView(
-      scrollController: _scrollController,
-      child: Column(
-        children: <Widget>[
-          NoteTitleEditor(
-            _titleTextController,
-            _noteTitleTextChanged,
+    Widget editor;
+    if (_useRichEditor) {
+      // super_editor's top-level render object is a SliverHybridStack
+      // (RenderSliver family) - it must hang directly off a CustomScrollView.
+      // A Column (RenderFlex) only accepts RenderBox children: in debug the
+      // assert fires, in release the sliver is never laid out or painted and
+      // the editor shows up as a dead grey block.
+      editor = CustomScrollView(
+        controller: _scrollController,
+        slivers: <Widget>[
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 0.0),
+            sliver: SliverToBoxAdapter(
+              child: NoteTitleEditor(
+                _titleTextController,
+                _noteTitleTextChanged,
+              ),
+            ),
           ),
-          bodyEditor,
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16.0, 0.0, 16.0, 16.0),
+            sliver: bodyEditor,
+          ),
         ],
-      ),
-    );
+      );
+    } else {
+      editor = EditorScrollView(
+        scrollController: _scrollController,
+        child: Column(
+          children: <Widget>[
+            NoteTitleEditor(
+              _titleTextController,
+              _noteTitleTextChanged,
+            ),
+            bodyEditor,
+          ],
+        ),
+      );
+    }
 
     // In the rich editor the body already shows the rendered result, so the
     // split screen preview makes no sense there.

@@ -175,7 +175,7 @@ class SuperEditorBodyState extends State<SuperEditorBody> {
       child: SuperEditor(
         editor: _editor,
         autofocus: widget.autofocus,
-        // The outer EditorScrollView owns scrolling.
+        // The outer CustomScrollView owns scrolling.
         shrinkWrap: true,
         stylesheet: _buildStylesheet(theme),
         componentBuilders: [
