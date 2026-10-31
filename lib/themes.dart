@@ -7,6 +7,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'app/theme/app_radii.dart';
+import 'app/theme/expressive_surfaces.dart';
 import 'settings/settings.dart';
 import 'themes/glass_theme.dart';
 
@@ -177,27 +179,26 @@ class Themes {
         ),
       ),
       cardTheme: CardThemeData(
-        color: Color.alphaBlend(t.card, t.base),
+        color: ExpressiveSurfaces.cardColor(brightness, t),
         elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-          side: BorderSide(color: t.edge),
-        ),
+        shape: ExpressiveSurfaces.cardShape(t),
         margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: Color.alphaBlend(t.popover, t.base),
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-          side: BorderSide(color: t.edge),
+          borderRadius: BorderRadius.circular(AppRadii.dialog),
+          side: ExpressiveSurfaces.cardBorderSide(t),
         ),
       ),
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: Color.alphaBlend(t.popover, t.base),
         elevation: 0,
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AppRadii.dialog),
+          ),
         ),
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(

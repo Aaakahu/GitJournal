@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:gitjournal/l10n.dart';
 import 'package:gitjournal/settings/settings.dart';
 import 'package:gitjournal/themes.dart';
+import 'package:gitjournal/app/theme/app_radii.dart';
 import 'package:gitjournal/themes/glass_theme.dart';
 import 'package:provider/provider.dart';
 
@@ -102,7 +103,7 @@ class _SettingsThemeState extends State<SettingsThemeScreen> {
         }
         settings.save();
       },
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(AppRadii.card),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Row(
@@ -133,7 +134,7 @@ class _SettingsThemeState extends State<SettingsThemeScreen> {
             ? Container(
                 decoration: BoxDecoration(
                   color: option.themeData.cardColor,
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(AppRadii.card),
                   border: Border.all(color: option.themeData.dividerColor),
                 ),
                 child: row,

@@ -7,6 +7,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:gitjournal/app/theme/app_effects.dart';
 import 'package:gitjournal/core/note.dart';
 import 'package:gitjournal/core/notes/note.dart';
 import 'package:gitjournal/core/views/first_image_view.dart';
@@ -51,14 +52,9 @@ class NoteTile extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: const BorderRadius.all(Radius.circular(8)),
         border: Border.all(color: borderColor, width: selected ? 2.0 : 1.0),
-        // Lifts the card off the background a little.
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
-            blurRadius: 6.0,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        // 静止卡片极淡投影：仅亮色，暗色靠表面分层（AppEffects.restingCardShadow）。
+        boxShadow: AppEffects.restingCardShadow(theme.colorScheme) ??
+            const <BoxShadow>[],
       ),
       padding: const EdgeInsets.all(16.0),
       child: Column(

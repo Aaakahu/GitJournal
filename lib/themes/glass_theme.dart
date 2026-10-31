@@ -11,6 +11,9 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 
+import '../app/theme/app_effects.dart';
+import '../app/theme/app_radii.dart';
+
 /// solid-glass tokens for one brightness.
 @immutable
 class GlassTokens extends ThemeExtension<GlassTokens> {
@@ -199,7 +202,7 @@ class GlassPanel extends StatelessWidget {
   final Color? fill;
   final EdgeInsetsGeometry padding;
 
-  /// 14 for surfaces, 11 for control-level elements.
+  /// [AppRadii.card] for surfaces, [AppRadii.input] for control-level elements.
   final double radius;
   final bool blur;
 
@@ -208,7 +211,7 @@ class GlassPanel extends StatelessWidget {
     this.child,
     this.fill,
     this.padding = const EdgeInsets.all(16),
-    this.radius = 14,
+    this.radius = AppRadii.card,
     this.blur = false,
   });
 
@@ -216,23 +219,17 @@ class GlassPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens =
         Theme.of(context).extension<GlassTokens>() ?? GlassTokens.light;
+    final colors = Theme.of(context).colorScheme;
+
+    // 浮层（blur=true）用单层语义阴影；静止表面浅色给极淡投影、暗色不给。
+    final boxShadow = blur
+        ? AppEffects.softShadow(colors)
+        : (AppEffects.restingCardShadow(colors) ?? const <BoxShadow>[]);
 
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(radius),
-        boxShadow: [
-          BoxShadow(
-            offset: const Offset(0, 12),
-            blurRadius: 32,
-            spreadRadius: -14,
-            color: tokens.shade,
-          ),
-          BoxShadow(
-            offset: const Offset(0, 1),
-            blurRadius: 2,
-            color: tokens.contact,
-          ),
-        ],
+        boxShadow: boxShadow,
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(radius),
@@ -303,7 +300,7 @@ class GlassCard extends StatelessWidget {
     super.key,
     this.child,
     this.padding = const EdgeInsets.all(16),
-    this.radius = 14,
+    this.radius = AppRadii.card,
   });
 
   @override
