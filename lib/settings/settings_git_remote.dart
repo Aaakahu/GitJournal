@@ -287,18 +287,22 @@ class Button extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    var theme = Theme.of(context);
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
         style: ButtonStyle(
           backgroundColor:
-              WidgetStateProperty.all<Color>(Theme.of(context).primaryColor),
+              WidgetStateProperty.all<Color>(theme.primaryColor),
+          foregroundColor:
+              WidgetStateProperty.all<Color>(theme.colorScheme.onPrimary),
         ),
         onPressed: onPressed,
         child: Text(
           text,
           textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.labelLarge,
+          style: theme.textTheme.labelLarge
+              ?.copyWith(color: theme.colorScheme.onPrimary),
         ),
       ),
     );
@@ -320,7 +324,11 @@ class RedButton extends StatelessWidget {
           backgroundColor: WidgetStateProperty.all<Color>(Colors.red),
         ),
         onPressed: onPressed,
-        child: Text(text, textAlign: TextAlign.center),
+        child: Text(
+          text,
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: Colors.white),
+        ),
       ),
     );
   }

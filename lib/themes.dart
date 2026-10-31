@@ -148,6 +148,12 @@ class Themes {
         onSurfaceVariant: t.foreground.withAlpha(153),
       ),
       primaryColor: t.primary,
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: t.primary,
+          foregroundColor: onPrimary,
+        ),
+      ),
       scaffoldBackgroundColor:
           brightness == Brightness.light ? Colors.transparent : t.base,
       canvasColor: Color.alphaBlend(t.popover, t.base),

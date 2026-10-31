@@ -1,9 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Solid warm-white launch background: no icon flash, seamless into the
+     app's first frame (Glass light base #faf9f0). -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@android:color/black" />
-    <item>
-        <bitmap
-            android:gravity="center"
-            android:src="@drawable/icon" />
-    </item>
+    <item android:drawable="@color/launch_background" />
 </layer-list>
