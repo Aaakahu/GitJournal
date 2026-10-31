@@ -351,6 +351,45 @@ class AppLocalizationsJa extends AppLocalizations {
       'This will HARD reset the current branch to its remote';
 
   @override
+  String get gitSyncRepoSectionTitle => 'Repository';
+
+  @override
+  String get gitSyncRepoSectionDesc =>
+      'The remote URL and current branch of this repository.';
+
+  @override
+  String get gitSyncRemoteUrl => 'Remote URL';
+
+  @override
+  String get gitSyncSyncSectionTitle => 'Sync';
+
+  @override
+  String get gitSyncSyncSectionDesc => 'Sync your notes with the Git host.';
+
+  @override
+  String get gitSyncSyncNow => 'Sync Now';
+
+  @override
+  String get gitSyncSyncing => 'Syncing…';
+
+  @override
+  String get gitSyncLastSync => 'Last Sync';
+
+  @override
+  String get gitSyncSshSectionTitle => 'SSH Keys';
+
+  @override
+  String get gitSyncSshSectionDesc =>
+      'The keys this device uses to connect to the Git host.';
+
+  @override
+  String get gitSyncDangerSectionTitle => 'Danger Zone';
+
+  @override
+  String get gitSyncDangerSectionDesc =>
+      'Hard reset discards local changes that were never synced.';
+
+  @override
   String get settingsNoteMetaDataTitle => 'Note Metadata Settings';
 
   @override
@@ -1136,6 +1175,9 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get drawerSetup => 'Setup Git Host';
+
+  @override
+  String get drawerGitSync => 'Git sync';
 
   @override
   String get drawerPro => 'Unlock Pro Version';

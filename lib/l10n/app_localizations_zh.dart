@@ -328,6 +328,42 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsGitRemoteResetHardSubtitle => '这将对当前分支执行硬重置，还原到其远端状态';
 
   @override
+  String get gitSyncRepoSectionTitle => '仓库';
+
+  @override
+  String get gitSyncRepoSectionDesc => '查看仓库的远端地址与当前分支（只读）。';
+
+  @override
+  String get gitSyncRemoteUrl => '远端 URL';
+
+  @override
+  String get gitSyncSyncSectionTitle => '同步';
+
+  @override
+  String get gitSyncSyncSectionDesc => '与 Git 托管平台同步你的笔记。';
+
+  @override
+  String get gitSyncSyncNow => '立即同步';
+
+  @override
+  String get gitSyncSyncing => '同步中…';
+
+  @override
+  String get gitSyncLastSync => '上次同步';
+
+  @override
+  String get gitSyncSshSectionTitle => 'SSH 密钥';
+
+  @override
+  String get gitSyncSshSectionDesc => '本设备连接 Git 托管平台所用的 SSH 密钥。';
+
+  @override
+  String get gitSyncDangerSectionTitle => '危险操作';
+
+  @override
+  String get gitSyncDangerSectionDesc => '硬重置会丢弃从未同步过的本地改动，请谨慎操作。';
+
+  @override
   String get settingsNoteMetaDataTitle => '便签元数据设置';
 
   @override
@@ -1085,6 +1121,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get drawerSetup => '设置 Git 托管平台';
+
+  @override
+  String get drawerGitSync => 'Git 同步';
 
   @override
   String get drawerPro => '解锁 Pro 版本';
@@ -1688,6 +1727,42 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get settingsGitRemoteResetHardSubtitle => '这将对当前分支执行硬重置，还原到其远端状态';
 
   @override
+  String get gitSyncRepoSectionTitle => '仓库';
+
+  @override
+  String get gitSyncRepoSectionDesc => '查看仓库的远端地址与当前分支（只读）。';
+
+  @override
+  String get gitSyncRemoteUrl => '远端 URL';
+
+  @override
+  String get gitSyncSyncSectionTitle => '同步';
+
+  @override
+  String get gitSyncSyncSectionDesc => '与 Git 托管平台同步你的笔记。';
+
+  @override
+  String get gitSyncSyncNow => '立即同步';
+
+  @override
+  String get gitSyncSyncing => '同步中…';
+
+  @override
+  String get gitSyncLastSync => '上次同步';
+
+  @override
+  String get gitSyncSshSectionTitle => 'SSH 密钥';
+
+  @override
+  String get gitSyncSshSectionDesc => '本设备连接 Git 托管平台所用的 SSH 密钥。';
+
+  @override
+  String get gitSyncDangerSectionTitle => '危险操作';
+
+  @override
+  String get gitSyncDangerSectionDesc => '硬重置会丢弃从未同步过的本地改动，请谨慎操作。';
+
+  @override
   String get settingsNoteMetaDataTitle => '便签元数据设置';
 
   @override
@@ -2445,6 +2520,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get drawerSetup => '设置 Git 托管平台';
+
+  @override
+  String get drawerGitSync => 'Git 同步';
 
   @override
   String get drawerPro => '解锁 Pro 版本';

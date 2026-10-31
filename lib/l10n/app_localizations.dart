@@ -735,6 +735,78 @@ abstract class AppLocalizations {
   /// **'This will HARD reset the current branch to its remote'**
   String get settingsGitRemoteResetHardSubtitle;
 
+  /// No description provided for @gitSyncRepoSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Repository'**
+  String get gitSyncRepoSectionTitle;
+
+  /// No description provided for @gitSyncRepoSectionDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'The remote URL and current branch of this repository.'**
+  String get gitSyncRepoSectionDesc;
+
+  /// No description provided for @gitSyncRemoteUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Remote URL'**
+  String get gitSyncRemoteUrl;
+
+  /// No description provided for @gitSyncSyncSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync'**
+  String get gitSyncSyncSectionTitle;
+
+  /// No description provided for @gitSyncSyncSectionDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync your notes with the Git host.'**
+  String get gitSyncSyncSectionDesc;
+
+  /// No description provided for @gitSyncSyncNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync Now'**
+  String get gitSyncSyncNow;
+
+  /// No description provided for @gitSyncSyncing.
+  ///
+  /// In en, this message translates to:
+  /// **'Syncing…'**
+  String get gitSyncSyncing;
+
+  /// No description provided for @gitSyncLastSync.
+  ///
+  /// In en, this message translates to:
+  /// **'Last Sync'**
+  String get gitSyncLastSync;
+
+  /// No description provided for @gitSyncSshSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'SSH Keys'**
+  String get gitSyncSshSectionTitle;
+
+  /// No description provided for @gitSyncSshSectionDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'The keys this device uses to connect to the Git host.'**
+  String get gitSyncSshSectionDesc;
+
+  /// No description provided for @gitSyncDangerSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Danger Zone'**
+  String get gitSyncDangerSectionTitle;
+
+  /// No description provided for @gitSyncDangerSectionDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Hard reset discards local changes that were never synced.'**
+  String get gitSyncDangerSectionDesc;
+
   /// No description provided for @settingsNoteMetaDataTitle.
   ///
   /// In en, this message translates to:
@@ -2156,6 +2228,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Setup Git Host'**
   String get drawerSetup;
+
+  /// No description provided for @drawerGitSync.
+  ///
+  /// In en, this message translates to:
+  /// **'Git sync'**
+  String get drawerGitSync;
 
   /// No description provided for @drawerPro.
   ///

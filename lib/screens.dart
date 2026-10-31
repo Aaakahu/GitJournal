@@ -30,7 +30,7 @@ import 'package:gitjournal/iap/purchase_thankyou_screen.dart';
 import 'package:gitjournal/iap/purchase_widget.dart';
 import 'package:gitjournal/l10n.dart';
 import 'package:gitjournal/screens/onboarding_screens.dart';
-import 'package:gitjournal/settings/settings_git_remote.dart';
+import 'package:gitjournal/settings/git_sync_screen.dart';
 import 'package:gitjournal/settings/settings_git_widgets.dart';
 import 'package:gitjournal/settings/settings_note_metadata.dart';
 import 'package:gitjournal/settings/settings_screen.dart';
