@@ -6,6 +6,8 @@
 
 import 'package:flutter/material.dart';
 
+import 'package:gitjournal/app/theme/expressive_motion.dart';
+
 class HeroDialogRoute<T> extends PageRoute<T> {
   HeroDialogRoute({required this.builder}) : super();
 
@@ -18,7 +20,7 @@ class HeroDialogRoute<T> extends PageRoute<T> {
   bool get barrierDismissible => true;
 
   @override
-  Duration get transitionDuration => const Duration(milliseconds: 200);
+  Duration get transitionDuration => ExpressiveMotion.medium;
 
   @override
   bool get maintainState => true;

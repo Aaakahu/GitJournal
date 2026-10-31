@@ -71,6 +71,39 @@ String noteSummaryText(String markdown) {
   return text;
 }
 
+/// The `#情绪` tag line the mood selector toggles. The pipeline (v1) only
+/// tracks the tag's presence, never which mood was picked. The tag lives on
+/// its own line at the top of the body - i.e. right after the frontmatter,
+/// which is not part of the body text.
+const String gjMoodTag = '#情绪';
+
+final RegExp _moodTagLineRegex = RegExp(r'^#情绪[ \t]*$', multiLine: true);
+
+/// Whether the body contains the `#情绪` mood tag line.
+bool hasMoodTag(String body) => _moodTagLineRegex.hasMatch(body);
+
+/// Adds or removes the standalone `#情绪` line at the top of the [body]
+/// (a blank line separates it from the rest). Returns the new body.
+String toggleMoodTag(String body) {
+  var match = _moodTagLineRegex.firstMatch(body);
+  if (match != null) {
+    var start = match.start;
+    var end = match.end;
+    // Swallow the line's own newline (or the preceding one when it is the
+    // last line), plus one following blank line - symmetric to insertion.
+    if (end < body.length && body[end] == '\n') {
+      end++;
+      if (end < body.length && body[end] == '\n') end++;
+    } else if (start > 0 && body[start - 1] == '\n') {
+      start--;
+    }
+    return body.replaceRange(start, end, '');
+  }
+
+  if (body.isEmpty) return '$gjMoodTag\n';
+  return '$gjMoodTag\n\n$body';
+}
+
 String replaceMarkdownChars(String line) {
   line = line.replaceFirst('- [ ]', '☐');
   line = line.replaceFirst('- [x]', '☑');

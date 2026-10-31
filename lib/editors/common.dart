@@ -69,7 +69,9 @@ class EditorAppBar extends StatelessWidget implements PreferredSizeWidget {
   final Editor editor;
   final EditorState editorState;
   final bool noteModified;
-  final IconButton? extraButton;
+
+  /// Extra actions shown at the start of the app bar actions.
+  final List<Widget> extraActions;
   final bool allowEdits;
   final Func0<void> onEditingModeChange;
 
@@ -80,7 +82,7 @@ class EditorAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.noteModified,
     required this.allowEdits,
     required this.onEditingModeChange,
-    this.extraButton,
+    this.extraActions = const [],
   }) : preferredSize = const Size.fromHeight(kToolbarHeight);
 
   @override
@@ -97,7 +99,7 @@ class EditorAppBar extends StatelessWidget implements PreferredSizeWidget {
         },
       ),
       actions: <Widget>[
-        if (extraButton != null) extraButton!,
+        ...extraActions,
         IconButton(
           icon: allowEdits
               ? const Icon(Icons.remove_red_eye)

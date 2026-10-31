@@ -22,7 +22,7 @@ class EditorScaffold extends StatefulWidget {
   final EditorState editorState;
   final bool noteModified;
   final bool editMode;
-  final IconButton? extraButton;
+  final List<Widget> extraActions;
   final Widget body;
   final NotesFolderFS parentFolder;
 
@@ -50,7 +50,7 @@ class EditorScaffold extends StatefulWidget {
     required this.redoAllowed,
     required this.findAllowed,
     this.extraBottomWidget,
-    this.extraButton,
+    this.extraActions = const [],
   });
 
   @override
@@ -158,7 +158,7 @@ class _EditorScaffoldState extends State<EditorScaffold> {
               editor: widget.editor,
               editorState: widget.editorState,
               noteModified: widget.noteModified,
-              extraButton: widget.extraButton,
+              extraActions: widget.extraActions,
               allowEdits: _editingMode,
               onEditingModeChange: _switchMode,
             ),

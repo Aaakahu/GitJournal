@@ -7,6 +7,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:function_types/function_types.dart';
+import 'package:gitjournal/app/theme/expressive_motion.dart';
 import 'package:gitjournal/l10n.dart';
 
 import 'common.dart';
@@ -242,7 +243,7 @@ void scrollToSearchResult({
 
   scrollController.animateTo(
     newPosition,
-    duration: const Duration(milliseconds: 300),
+    duration: ExpressiveMotion.medium,
     curve: Easing.legacyDecelerate,
   );
 }

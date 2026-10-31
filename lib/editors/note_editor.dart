@@ -23,6 +23,7 @@ import 'package:gitjournal/core/views/inline_tags_view.dart';
 import 'package:gitjournal/editors/checklist_editor.dart';
 import 'package:gitjournal/editors/common.dart';
 import 'package:gitjournal/editors/common_types.dart';
+import 'package:gitjournal/editors/editing_session_registry.dart';
 import 'package:gitjournal/editors/journal_editor.dart';
 import 'package:gitjournal/editors/markdown_editor.dart';
 import 'package:gitjournal/editors/org_editor.dart';
@@ -148,6 +149,9 @@ class NoteEditorState extends State<NoteEditor>
   // didChangeAppLifecycleState).
   String? _lastFocusSavedSummary;
 
+  // 编辑租约：本编辑会话当前持有的 note 路径（见 EditingSessionRegistry）。
+  String _leasedPath = '';
+
   NoteEditorState.newNote(
     NotesFolderFS folder,
     String existingText,
@@ -225,12 +229,24 @@ class NoteEditorState extends State<NoteEditor>
           break;
       }
     }
+
+    _renewLease();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    EditingSessionRegistry.endSession(_leasedPath);
     super.dispose();
+  }
+
+  /// 租约跟随 note 的当前路径：重命名/移动后旧路径注销、新路径登记。
+  void _renewLease() {
+    final path = _note.filePath;
+    if (path == _leasedPath) return;
+    EditingSessionRegistry.endSession(_leasedPath);
+    EditingSessionRegistry.beginSession(path);
+    _leasedPath = path;
   }
 
   @override
@@ -394,6 +410,7 @@ class NoteEditorState extends State<NoteEditor>
       setState(() {
         _note = note.copyWithFileName(newFileName);
         _newNoteRenamed = true;
+        _renewLease();
       });
     } else {
       var repo = context.read<GitJournalRepo>();
@@ -403,6 +420,7 @@ class NoteEditorState extends State<NoteEditor>
         var newNote = await repo.renameNote(originalNote, newFileName);
         setState(() {
           _note = newNote;
+          _renewLease();
         });
       } catch (ex) {
         if (!mounted) return;
@@ -535,6 +553,7 @@ class NoteEditorState extends State<NoteEditor>
           note = note.copyWithFileName(note.rebuildFileName());
           setState(() {
             _note = note;
+            _renewLease();
           });
         }
         await repo.addNote(note);
@@ -544,6 +563,7 @@ class NoteEditorState extends State<NoteEditor>
         if (!mounted) return false;
         setState(() {
           _note = modifiedNote;
+          _renewLease();
         });
       }
     } catch (e, stackTrace) {
@@ -606,6 +626,7 @@ class NoteEditorState extends State<NoteEditor>
 
           setState(() {
             _note = n;
+            _renewLease();
           });
         } catch (ex) {
           showErrorSnackbar(context, ex);

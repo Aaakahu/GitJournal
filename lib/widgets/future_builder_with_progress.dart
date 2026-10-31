@@ -6,6 +6,8 @@
 
 import 'package:flutter/material.dart';
 
+import 'package:gitjournal/widgets/delayed_loading_gate.dart';
+
 class FutureBuilderWithProgress<T> extends StatelessWidget {
   final Future<T> future;
 
@@ -21,7 +23,13 @@ class FutureBuilderWithProgress<T> extends StatelessWidget {
         if (snapshot.hasData) {
           return snapshot.data as Widget;
         }
-        return const Center(child: CircularProgressIndicator());
+        // 本地读取毫秒级：300ms 内完成就不闪指示器，超时才给出等待反馈。
+        return DelayedLoadingGate(
+          loading: true,
+          builder: (context, showLoading) => showLoading
+              ? const Center(child: CircularProgressIndicator())
+              : const SizedBox(),
+        );
       },
       future: future,
     );

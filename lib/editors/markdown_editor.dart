@@ -11,6 +11,7 @@ import 'package:gitjournal/core/image.dart';
 import 'package:gitjournal/core/note.dart';
 import 'package:gitjournal/core/notes/note.dart';
 import 'package:gitjournal/editors/common.dart';
+import 'package:gitjournal/editors/editing_session_registry.dart';
 import 'package:gitjournal/editors/editor_scroll_view.dart';
 import 'package:gitjournal/editors/heuristics.dart';
 import 'package:gitjournal/editors/markdown_toolbar.dart';
@@ -88,6 +89,11 @@ class MarkdownEditorState extends State<MarkdownEditor>
   String? _roundtripCheckedBody;
   bool _roundtripStable = false;
 
+  /// Whether the body currently carries the `#情绪` tag - drives the mood
+  /// button's icon. Kept as a field so the icon updates even when the text
+  /// change itself doesn't trigger a rebuild.
+  late bool _hasMoodTag;
+
   @override
   void initState() {
     super.initState();
@@ -113,6 +119,8 @@ class MarkdownEditorState extends State<MarkdownEditor>
 
     _useRichEditor =
         AppConfig.instance.richMarkdownEditor && _isSafeForRichEditor(_note.body);
+
+    _hasMoodTag = hasMoodTag(_note.body);
   }
 
   bool _isSafeForRichEditor(String body) {
@@ -163,8 +171,14 @@ class MarkdownEditorState extends State<MarkdownEditor>
     }
     if (oldWidget.note != widget.note) {
       _note = widget.note;
-      _textController.text = _note.body;
-      _titleTextController.text = _note.title ?? "";
+      // 编辑租约：路径仍被编辑会话持有时，同步重载送来的新 Note 不回写编辑器
+      // 正文/标题（跳过重载，编辑会话的内容为准）；租约期间到达的 Note 只会
+      // 是本会话自己保存/重命名的产物，内容与编辑器一致，跳过无损失。
+      if (!EditingSessionRegistry.isBeingEdited(widget.note.filePath)) {
+        _textController.text = _note.body;
+        _titleTextController.text = _note.title ?? "";
+        _hasMoodTag = hasMoodTag(_note.body);
+      }
     }
   }
 
@@ -198,21 +212,36 @@ class MarkdownEditorState extends State<MarkdownEditor>
       // A Column (RenderFlex) only accepts RenderBox children: in debug the
       // assert fires, in release the sliver is never laid out or painted and
       // the editor shows up as a dead grey block.
-      editor = CustomScrollView(
-        controller: _scrollController,
-        slivers: <Widget>[
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 0.0),
-            sliver: SliverToBoxAdapter(
-              child: NoteTitleEditor(
-                _titleTextController,
-                _noteTitleTextChanged,
+      //
+      // The selection format toolbar (SuperEditorBody) mounts itself into the
+      // nearest Overlay. Hosting that Overlay HERE, with the editor as its
+      // base entry, keeps the toolbar inside this route's subtree so pushed
+      // routes and dialogs cover it - the root overlay would float above
+      // them. The rich branch's widget structure is static (content flows
+      // through controllers), so the base entry never goes stale.
+      editor = Overlay(
+        initialEntries: [
+          OverlayEntry(
+            builder: (context) => Positioned.fill(
+              child: CustomScrollView(
+                controller: _scrollController,
+                slivers: <Widget>[
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 0.0),
+                    sliver: SliverToBoxAdapter(
+                      child: NoteTitleEditor(
+                        _titleTextController,
+                        _noteTitleTextChanged,
+                      ),
+                    ),
+                  ),
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16.0, 0.0, 16.0, 16.0),
+                    sliver: bodyEditor,
+                  ),
+                ],
               ),
             ),
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16.0, 0.0, 16.0, 16.0),
-            sliver: bodyEditor,
           ),
         ],
       );
@@ -261,6 +290,32 @@ class MarkdownEditorState extends State<MarkdownEditor>
       );
     }
 
+    final extraActions = <Widget>[
+      IconButton(
+        tooltip: context.loc.editorMoodTooltip,
+        icon: Icon(
+          _hasMoodTag ? Icons.mood : Icons.mood_outlined,
+          color: _hasMoodTag ? Theme.of(context).colorScheme.secondary : null,
+        ),
+        onPressed: _showMoodPicker,
+      ),
+    ];
+    if (!_useRichEditor) {
+      extraActions.add(IconButton(
+        tooltip: context.loc.editorLivePreview,
+        icon: Icon(
+          Icons.vertical_split,
+          color: appConfig.livePreview
+              ? Theme.of(context).colorScheme.secondary
+              : null,
+        ),
+        onPressed: () {
+          appConfig.livePreview = !appConfig.livePreview;
+          appConfig.save();
+        },
+      ));
+    }
+
     return EditorScaffold(
       startingNote: widget.note,
       editor: widget,
@@ -273,21 +328,7 @@ class MarkdownEditorState extends State<MarkdownEditor>
       onRedoSelected: _redo,
       undoAllowed: _undoRedoStack.undoPossible,
       redoAllowed: _undoRedoStack.redoPossible,
-      extraButton: _useRichEditor
-          ? null
-          : IconButton(
-              tooltip: context.loc.editorLivePreview,
-              icon: Icon(
-                Icons.vertical_split,
-                color: appConfig.livePreview
-                    ? Theme.of(context).colorScheme.secondary
-                    : null,
-              ),
-              onPressed: () {
-                appConfig.livePreview = !appConfig.livePreview;
-                appConfig.save();
-              },
-            ),
+      extraActions: extraActions,
       extraBottomWidget: markdownToolbar,
       findAllowed: true,
     );
@@ -316,6 +357,7 @@ class MarkdownEditorState extends State<MarkdownEditor>
   /// serialization debounce interval, and search highlighting is not
   /// rendered (find still works on the plain text).
   void _richTextChanged() {
+    _checkMoodTagChanged();
     if (_noteModified && !widget.editMode) return;
 
     var newState = !(widget.editMode && _textController.text.trim().isEmpty);
@@ -355,6 +397,7 @@ class MarkdownEditorState extends State<MarkdownEditor>
       Log.e("EditorHeuristics: $e");
       logExceptionWarning(e, stackTrace);
     }
+    _checkMoodTagChanged();
     if (_noteModified && !widget.editMode) return;
 
     var newState = !(widget.editMode && _textController.text.trim().isEmpty);
@@ -364,6 +407,75 @@ class MarkdownEditorState extends State<MarkdownEditor>
       });
     }
 
+    notifyListeners();
+  }
+
+  /// Keeps the mood button's icon in sync with the body text even when no
+  /// other rebuild is scheduled (live preview off, modified flag unchanged).
+  void _checkMoodTagChanged() {
+    var hasMood = hasMoodTag(_textController.text);
+    if (hasMood != _hasMoodTag) {
+      setState(() {
+        _hasMoodTag = hasMood;
+      });
+    }
+  }
+
+  /// The mood picker (v1): any selection toggles the `#情绪` tag - the
+  /// pipeline only tracks the tag's presence, never which mood was picked.
+  void _showMoodPicker() {
+    const moods = ['😊', '😐', '😟', '😫', '😡', '🤩'];
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) {
+        var theme = Theme.of(sheetContext);
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Text(
+                  sheetContext.loc.editorMoodPickerTitle,
+                  style: theme.textTheme.titleMedium,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    for (var mood in moods)
+                      IconButton(
+                        onPressed: () {
+                          Navigator.of(sheetContext).pop();
+                          _toggleMoodTag();
+                        },
+                        tooltip: mood,
+                        icon: Text(mood, style: const TextStyle(fontSize: 28)),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// Toggles the standalone `#情绪` line at the top of the body. Not tracked
+  /// by the undo stack - tagging a mood isn't undoable.
+  void _toggleMoodTag() {
+    var newText = toggleMoodTag(_textController.text);
+    setState(() {
+      _textController.value = TextEditingValue(
+        text: newText,
+        selection: const TextSelection.collapsed(offset: 0),
+      );
+      _hasMoodTag = hasMoodTag(newText);
+      _noteModified = true;
+    });
     notifyListeners();
   }
 

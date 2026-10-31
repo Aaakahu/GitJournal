@@ -5,6 +5,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gitjournal/markdown/gj_markdown_serializers.dart';
 import 'package:gitjournal/markdown/rich_editor_safety.dart';
+import 'package:super_editor/super_editor.dart';
 
 void main() {
   group('markdown roundtrip (deserialize -> serialize)', () {
@@ -72,6 +73,60 @@ void main() {
       final out = serializeGitJournalDocument(doc);
       expect(out, contains('- [ ] open'));
       expect(out, contains('- [x] done'));
+    });
+
+    test('selection-toolbar toggles (B/I/S/H) serialize to stable markdown',
+        () {
+      // The exact edit requests the selection format toolbar issues, applied
+      // to a plain paragraph: the resulting markers must roundtrip.
+      final doc = deserializeGitJournalMarkdown('Hello world');
+      final composer = MutableDocumentComposer();
+      final editor = createDefaultDocumentEditor(
+        document: doc,
+        composer: composer,
+        isHistoryEnabled: false,
+      );
+      final node = doc.getNodeAt(0) as ParagraphNode;
+      final range = DocumentRange(
+        start: DocumentPosition(
+          nodeId: node.id,
+          nodePosition: const TextNodePosition(offset: 0),
+        ),
+        end: DocumentPosition(
+          nodeId: node.id,
+          nodePosition: TextNodePosition(offset: node.text.length),
+        ),
+      );
+
+      editor.execute([
+        ToggleTextAttributionsRequest(
+          documentRange: range,
+          attributions: {boldAttribution},
+        ),
+        ToggleTextAttributionsRequest(
+          documentRange: range,
+          attributions: {italicsAttribution},
+        ),
+        ToggleTextAttributionsRequest(
+          documentRange: range,
+          attributions: {strikethroughAttribution},
+        ),
+        ChangeParagraphBlockTypeRequest(
+          nodeId: node.id,
+          blockType: header1Attribution,
+        ),
+      ]);
+
+      final out = serializeGitJournalDocument(editor.document);
+      expect(out, contains('# '));
+      expect(out, contains('**'));
+      expect(out, contains('*'));
+      expect(out, contains('~~'));
+
+      // The serialized form must survive a full roundtrip unchanged.
+      final doc2 = deserializeGitJournalMarkdown(out);
+      final out2 = serializeGitJournalDocument(doc2);
+      expect(out2, equals(out));
     });
   });
 
