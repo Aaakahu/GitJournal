@@ -209,6 +209,84 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     expect(editorState.getNote().body, "Hello\n\n![x](./a.jpg)\n\nBye");
   });
+
+  testWidgets('Focus change after an external reload keeps the old composer '
+      'usable (regression: Cannot add new events after calling close)',
+      (tester) async {
+    var errors = <FlutterErrorDetails>[];
+    var originalOnError = FlutterError.onError;
+    FlutterError.onError = (details) => errors.add(details);
+
+    var controller = TextEditingController(text: "Hello World");
+    var focusTarget = FocusNode();
+
+    try {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Column(
+              children: [
+                Focus(focusNode: focusTarget, child: const SizedBox()),
+                Expanded(
+                  child: CustomScrollView(
+                    slivers: [
+                      SliverPadding(
+                        padding: const EdgeInsets.all(16),
+                        sliver: SuperEditorBody(
+                          textController: controller,
+                          imageDir: '/gj_test_images',
+                          autofocus: true,
+                          onChanged: () {},
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      // Bounded pumps, not pumpAndSettle: a focused super_editor blinks its
+      // caret and keeps scheduling frames forever.
+      await tester.pump();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byType(SuperEditor), findsOneWidget);
+
+      // The autofocus grabbed focus inside the editor body.
+      final primaryFocus = FocusManager.instance.primaryFocus;
+      expect(primaryFocus, isNotNull);
+      expect(
+        primaryFocus!.context
+            ?.findAncestorStateOfType<SuperEditorBodyState>(),
+        isNotNull,
+      );
+
+      // External change (image insertion, undo, search replace): reload the
+      // whole document while the old editor holds focus and a selection.
+      controller.text = "Hello external reload";
+
+      // Simulate the system focus fight seen on some phones: move focus
+      // away right after the reload. Before the fix, the old composer was
+      // disposed synchronously while the old SuperEditor widget was still
+      // mounted, so this focus change executed a ClearSelectionRequest on
+      // it and threw "Bad state: Cannot add new events after calling close"
+      // - which fails this test as an uncaught exception.
+      focusTarget.requestFocus();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pump(const Duration(milliseconds: 400));
+    } finally {
+      FlutterError.onError = originalOnError;
+    }
+
+    expect(
+      errors.where(
+          (e) => e.toString().contains('Cannot add new events after calling close')),
+      isEmpty,
+    );
+  });
 }
 
 class _NoopEditorCommon implements EditorCommon {

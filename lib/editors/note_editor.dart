@@ -142,6 +142,12 @@ class NoteEditorState extends State<NoteEditor>
 
   final _lock = Lock();
 
+  // Content summary (title+body) of the last focus-loss save. Some phones
+  // oscillate inactive <-> resumed every second; this keeps identical
+  // re-saves of unchanged content from hammering the disk (see
+  // didChangeAppLifecycleState).
+  String? _lastFocusSavedSummary;
+
   NoteEditorState.newNote(
     NotesFolderFS folder,
     String existingText,
@@ -236,11 +242,18 @@ class NoteEditorState extends State<NoteEditor>
       if (note == null) return;
       if (!_noteModified(note)) return;
 
+      // Only save when the content actually differs from what the last
+      // focus-loss save wrote. A failed save doesn't update the summary, so
+      // the next bounce retries it.
+      var summary = '${note.title ?? ''}\u0000${note.body}';
+      if (summary == _lastFocusSavedSummary) return;
+
       Log.d("App Lost Focus - saving note");
       var repo = context.read<GitJournalRepo>();
       () async {
         try {
           await repo.saveNoteToDisk(note);
+          _lastFocusSavedSummary = summary;
         } catch (ex) {
           Log.e("Failed to save note", ex: ex);
         }

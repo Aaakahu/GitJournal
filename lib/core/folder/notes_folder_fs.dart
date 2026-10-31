@@ -264,6 +264,14 @@ class NotesFolderFS with NotesFolderNotifier implements NotesFolder {
     var newFolders = <NotesFolderFS>[];
 
     final dir = io.Directory(fullFolderPath);
+    if (!dir.existsSync()) {
+      // A registered folder can outlive its physical directory (empty repo
+      // clone, half-finished onboarding): listing it throws
+      // PathNotFoundException ("Directory listing failed") as a whole-page
+      // error. Create it instead - an empty dir lists as empty, and later
+      // saves/syncs have a place to land.
+      dir.createSync(recursive: true);
+    }
     var lister = dir.list(recursive: false, followLinks: false);
     await for (var fsEntity in lister) {
       if (fsEntity is io.Link) {

@@ -108,13 +108,38 @@ class SuperEditorBodyState extends State<SuperEditorBody> {
       _composer = composer;
       _editor = editor;
     } else {
+      // Order matters here. The old SuperEditor widget is only removed from
+      // the tree by this frame's rebuild, and until then its
+      // EditorSelectionAndFocusPolicy keeps listening to focus changes and
+      // pushing them into its composer. Disposing the old composer
+      // synchronously therefore crashes with "Bad state: Cannot add new
+      // events after calling close" as soon as a focus change arrives (seen
+      // on phones where the app oscillates inactive <-> resumed every
+      // second).
+      //
+      // 1) Drop the primary focus first, while the old editor can still
+      //    process the resulting change. Only when the focus is actually
+      //    inside this editor - don't steal it from the title field on
+      //    unrelated external reloads.
+      final primaryFocus = FocusManager.instance.primaryFocus;
+      final focusContext = primaryFocus?.context;
+      if (focusContext != null &&
+          focusContext.findAncestorStateOfType<SuperEditorBodyState>() ==
+              this) {
+        primaryFocus!.unfocus();
+      }
       setState(() {
         _document = document;
         _composer = composer;
         _editor = editor;
       });
-      oldEditor!.dispose();
-      oldComposer!.dispose();
+      // 2) Dispose only after the frame ended: the framework has unmounted
+      //    the old SuperEditor widget by then, so no further events can
+      //    reach the old composer.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        oldEditor!.dispose();
+        oldComposer!.dispose();
+      });
     }
   }
 

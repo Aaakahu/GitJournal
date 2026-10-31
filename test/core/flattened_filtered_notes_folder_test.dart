@@ -6,7 +6,9 @@
 
 import 'dart:math';
 
+import 'package:dart_git/blob_ctime_builder.dart';
 import 'package:dart_git/dart_git.dart';
+import 'package:dart_git/file_mtime_builder.dart';
 import 'package:gitjournal/core/file/file_storage.dart';
 import 'package:gitjournal/core/folder/flattened_filtered_notes_folder.dart';
 import 'package:gitjournal/core/folder/notes_folder_config.dart';
@@ -150,5 +152,47 @@ void main() {
     // Test removing a note
     // Test loading it incrementally
     // Test renaming a file
+  });
+
+  group('NotesFolderFS: physically missing folder', () {
+    late io.Directory tempDir;
+    late NotesFolderFS rootFolder;
+    late NotesFolderConfig config;
+    late FileStorage fileStorage;
+
+    setUp(() async {
+      tempDir = await io.Directory.systemTemp.createTemp('__mfdir__');
+
+      SharedPreferences.setMockInitialValues({});
+      config = NotesFolderConfig('', await SharedPreferences.getInstance());
+
+      // Direct FileStorage (not .fake): its POSIX-root assert rejects
+      // Windows temp paths, and this test never loads an individual file.
+      fileStorage = FileStorage(
+        repoPath: tempDir.path + p.separator,
+        blobCTimeBuilder: BlobCTimeBuilder(),
+        fileMTimeBuilder: FileMTimeBuilder(),
+      );
+
+      rootFolder = NotesFolderFS.root(config, fileStorage);
+    });
+
+    tearDown(() async {
+      tempDir.deleteSync(recursive: true);
+    });
+
+    test('Loading a registered folder that was never created returns empty '
+        'and creates the directory', () async {
+      var folder = NotesFolderFS(rootFolder, "journal_2", config);
+      var dir = io.Directory(folder.fullFolderPath);
+      expect(dir.existsSync(), isFalse);
+
+      // Regression: this used to throw PathNotFoundException
+      // ("Directory listing failed") and take down the whole folder view.
+      await folder.load();
+
+      expect(folder.notes, isEmpty);
+      expect(dir.existsSync(), isTrue);
+    });
   });
 }

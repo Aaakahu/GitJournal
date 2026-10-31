@@ -193,21 +193,35 @@ class GitSyncScreenState extends State<GitSyncScreen> {
       _syncing = true;
     });
 
-    try {
-      await widget.repo!.syncNotes();
-      if (!mounted) return;
-      setState(() {
-        _syncing = false;
-        _lastSyncTime = DateTime.now();
-      });
-    } catch (ex, st) {
-      Log.e("GitSyncScreen syncNotes", ex: ex, stacktrace: st);
-      if (!mounted) return;
-      setState(() {
-        _syncing = false;
-      });
-      showErrorSnackbar(context, ex);
+    // Transient server failures (e.g. "GitPush failed: unpack error") get
+    // one automatic retry after a short wait. The button keeps its
+    // "syncing" state the whole time, so a second tap is a no-op, and the
+    // error is only surfaced after both attempts failed.
+    Object? error;
+    for (var attempt = 0; attempt < 2; attempt++) {
+      if (attempt > 0) {
+        await Future<void>.delayed(const Duration(seconds: 2));
+        if (!mounted) return;
+      }
+      try {
+        await widget.repo!.syncNotes();
+        if (!mounted) return;
+        setState(() {
+          _syncing = false;
+          _lastSyncTime = DateTime.now();
+        });
+        return;
+      } catch (ex, st) {
+        Log.e("GitSyncScreen syncNotes", ex: ex, stacktrace: st);
+        error = ex;
+      }
     }
+
+    if (!mounted) return;
+    setState(() {
+      _syncing = false;
+    });
+    showErrorSnackbar(context, error!);
   }
 
   void _customSshKeys() {
