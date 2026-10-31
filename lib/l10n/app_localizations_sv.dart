@@ -838,6 +838,24 @@ class AppLocalizationsSv extends AppLocalizations {
   String get editorLivePreview => 'Live preview';
 
   @override
+  String get editorMoodTooltip => 'Mood';
+
+  @override
+  String get editorMoodPickerTitle => 'How are you feeling?';
+
+  @override
+  String get selectionToolbarBold => 'Bold';
+
+  @override
+  String get selectionToolbarItalic => 'Italic';
+
+  @override
+  String get selectionToolbarStrikethrough => 'Strikethrough';
+
+  @override
+  String get selectionToolbarHeading => 'Heading';
+
+  @override
   String get editorsChecklistAdd => 'Add Item';
 
   @override
@@ -1108,6 +1126,9 @@ class AppLocalizationsSv extends AppLocalizations {
   String widgetsImageRendererHttpError(Object status, Object url) {
     return 'Code: $status for $url';
   }
+
+  @override
+  String get widgetsLongImageBadge => 'Long image';
 
   @override
   String widgetsNoteDeleteDialogTitle(num count) {

@@ -792,6 +792,24 @@ class AppLocalizationsZh extends AppLocalizations {
   String get editorLivePreview => '实时预览';
 
   @override
+  String get editorMoodTooltip => '心情';
+
+  @override
+  String get editorMoodPickerTitle => '此刻的心情如何？';
+
+  @override
+  String get selectionToolbarBold => '加粗';
+
+  @override
+  String get selectionToolbarItalic => '斜体';
+
+  @override
+  String get selectionToolbarStrikethrough => '删除线';
+
+  @override
+  String get selectionToolbarHeading => '标题';
+
+  @override
   String get editorsChecklistAdd => '添加条目';
 
   @override
@@ -1056,6 +1074,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String widgetsImageRendererHttpError(Object status, Object url) {
     return '代码：$status，来自 $url';
   }
+
+  @override
+  String get widgetsLongImageBadge => '长图';
 
   @override
   String widgetsNoteDeleteDialogTitle(num count) {
@@ -2191,6 +2212,24 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get editorLivePreview => '实时预览';
 
   @override
+  String get editorMoodTooltip => '心情';
+
+  @override
+  String get editorMoodPickerTitle => '此刻的心情如何？';
+
+  @override
+  String get selectionToolbarBold => '加粗';
+
+  @override
+  String get selectionToolbarItalic => '斜体';
+
+  @override
+  String get selectionToolbarStrikethrough => '删除线';
+
+  @override
+  String get selectionToolbarHeading => '标题';
+
+  @override
   String get editorsChecklistAdd => '添加条目';
 
   @override
@@ -2455,6 +2494,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String widgetsImageRendererHttpError(Object status, Object url) {
     return '代码：$status，来自 $url';
   }
+
+  @override
+  String get widgetsLongImageBadge => '长图';
 
   @override
   String widgetsNoteDeleteDialogTitle(num count) {

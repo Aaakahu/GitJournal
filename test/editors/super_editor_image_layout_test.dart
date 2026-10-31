@@ -1,0 +1,122 @@
+/*
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:gitjournal/editors/super_editor_body.dart';
+import 'package:gitjournal/l10n.dart';
+import 'package:image/image.dart' as im;
+import 'package:path/path.dart' as p;
+
+/// Regression tests for the image layout rules in [GjImageComponent]:
+///  - `|width` is a maximum width (small images are never upscaled);
+///  - images narrower than the column hug the start edge;
+///  - very tall images fold into a 2:3 box with a badge and open a full
+///    screen viewer when tapped.
+void main() {
+  late Directory tempDir;
+
+  setUp(() async {
+    tempDir = await Directory.systemTemp.createTemp('gj_image_layout_test');
+  });
+
+  tearDown(() async {
+    await tempDir.delete(recursive: true);
+  });
+
+  String writePng(String name, int width, int height) {
+    final image = im.Image(width, height);
+    im.fill(image, im.getColor(120, 140, 180));
+    final file = File(p.join(tempDir.path, name));
+    file.writeAsBytesSync(im.encodePng(image));
+    return name;
+  }
+
+  Future<void> pumpEditor(WidgetTester tester, String body) async {
+    final controller = TextEditingController(text: body);
+
+    await tester.runAsync(() async {
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: gitJournalLocalizationDelegates,
+          supportedLocales: gitJournalSupportedLocales,
+          home: Scaffold(
+            body: CustomScrollView(
+              slivers: [
+                SliverPadding(
+                  padding: const EdgeInsets.all(16),
+                  sliver: SuperEditorBody(
+                    textController: controller,
+                    imageDir: tempDir.path,
+                    autofocus: false,
+                    onChanged: () {},
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      // Real file IO + codec for the FileImage need real async time.
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+    });
+    await tester.pump();
+    await tester.pumpAndSettle();
+  }
+
+  RenderImage renderedImage(WidgetTester tester) =>
+      tester.renderObject<RenderImage>(find.byType(RawImage).first);
+
+  testWidgets('|600 is a max-width: a 100x50 image is not upscaled',
+      (tester) async {
+    var fileName = writePng('small.png', 100, 50);
+
+    await pumpEditor(tester, 'Hello\n\n![small]($fileName|600)\n\nBye');
+
+    final render = renderedImage(tester);
+    // Natural size kept: 600 is only an upper bound. The old forced-width
+    // behavior rendered this 600 wide.
+    expect(render.size.width, 100.0);
+    expect(render.size.height, 50.0);
+
+    // Narrow images hug the start edge instead of floating centered
+    // (16 = page padding; centered would be ~350).
+    expect(render.localToGlobal(Offset.zero).dx, lessThan(150.0));
+  });
+
+  testWidgets('images taller than 3:1 fold into a 2:3 box with a badge',
+      (tester) async {
+    var fileName = writePng('long.png', 60, 300); // ratio 5:1
+
+    await pumpEditor(tester, '![long]($fileName|600)');
+
+    // Folded display box: 600 wide (the |600 cap) and 1.5x that tall.
+    expect(
+      find.byWidgetPredicate(
+        (w) =>
+            w is SizedBox &&
+            w.width == 600.0 &&
+            w.height == 900.0 &&
+            w.child is ClipRect,
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Long image'), findsOneWidget);
+  });
+
+  testWidgets('tapping a folded image opens the full screen viewer',
+      (tester) async {
+    var fileName = writePng('long.png', 60, 300);
+
+    await pumpEditor(tester, '![long]($fileName)');
+
+    await tester.tap(find.byType(GjImageComponent));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(InteractiveViewer), findsOneWidget);
+  });
+}

@@ -13,6 +13,7 @@ import 'package:universal_io/io.dart';
 
 import 'package:gitjournal/core/note.dart';
 import 'package:gitjournal/utils/markdown.dart';
+import 'package:gitjournal/widgets/expressive_image_frame.dart';
 import 'notes_materialized_view.dart';
 
 typedef NotesFirstImageView = NotesMaterializedView<String>;
@@ -96,6 +97,7 @@ class NoteFirstImageThumbnail extends StatelessWidget {
           height: height,
           fit: BoxFit.cover,
           cacheWidth: cacheWidth,
+          frameBuilder: expressiveImageFrameBuilder,
           errorBuilder: (_, __, ___) => const SizedBox(),
         );
         if (maxHeight != null) {

@@ -5,11 +5,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import 'dart:math' as math;
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:gitjournal/l10n.dart';
 import 'package:gitjournal/logger/logger.dart';
 import 'package:gitjournal/settings/markdown_renderer_config.dart';
+import 'package:gitjournal/widgets/delayed_loading_gate.dart';
 import 'package:gitjournal/widgets/images/image_caption.dart';
 import 'package:gitjournal/widgets/images/image_details.dart';
 import 'package:gitjournal/widgets/images/themable_image.dart';
@@ -58,6 +62,55 @@ class MarkdownImage extends StatefulWidget {
 }
 
 class _MarkdownImageState extends State<MarkdownImage> {
+  // Intrinsic size of the decoded raster image, for the long-image fold
+  // decision. Filled synchronously when the image is cached, otherwise
+  // through the image stream.
+  ui.Image? _decodedImage;
+  String? _decodedPath;
+  ImageStream? _imageStream;
+  ImageStreamListener? _imageListener;
+
+  void _listenForImageSize(File file) {
+    if (_decodedPath == file.path) return;
+    if (_imageListener != null) {
+      _imageStream?.removeListener(_imageListener!);
+      _imageStream = null;
+      _imageListener = null;
+    }
+
+    final stream = FileImage(file).resolve(createLocalImageConfiguration(context));
+    final listener = ImageStreamListener((info, synchronousCall) {
+      if (!mounted || _decodedPath == file.path) return;
+      void apply() {
+        _decodedImage = info.image;
+        _decodedPath = file.path;
+      }
+
+      if (synchronousCall) {
+        // Inside build: just update the fields, this build still uses them.
+        apply();
+      } else {
+        setState(apply);
+      }
+    });
+    stream.addListener(listener);
+    _imageStream = stream;
+    _imageListener = listener;
+  }
+
+  @override
+  void dispose() {
+    if (_imageListener != null) {
+      _imageStream?.removeListener(_imageListener!);
+    }
+    super.dispose();
+  }
+
+  bool get _isLongImage {
+    final image = _decodedImage;
+    return image != null && image.height > image.width * 3;
+  }
+
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<MarkdownRendererConfig>();
@@ -88,6 +141,11 @@ class _MarkdownImageState extends State<MarkdownImage> {
       builder: (context, constraints) {
         final small =
             constraints.maxWidth < MediaQuery.of(context).size.width - 40;
+        // `|width` is a maximum width: smaller images keep their natural
+        // size, larger ones scale down to fit. No suffix: the column width.
+        final displayMaxWidth =
+            (width != null ? math.min(width, constraints.maxWidth) : constraints.maxWidth)
+                .clamp(1.0, double.infinity);
         final image = FutureBuilder(
             future: widget.data,
             builder: (context, snapshot) {
@@ -130,8 +188,10 @@ class _MarkdownImageState extends State<MarkdownImage> {
 
               if (snapshot.hasData) {
                 Widget im;
+                ThemableImage themable;
+                var isLongImage = false;
                 if (snapshot.data is String) {
-                  im = ThemableImage.svg(
+                  themable = ThemableImage.svg(
                     snapshot.data as String,
                     width: width ?? MediaQuery.of(context).size.width,
                     height: widget.height,
@@ -163,10 +223,16 @@ class _MarkdownImageState extends State<MarkdownImage> {
                         ? theme.canvasColor
                         : Colors.black,
                   );
+                  im = Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: themable,
+                  );
                 } else {
-                  im = ThemableImage.image(
-                    snapshot.data as File,
-                    width: width,
+                  final file = snapshot.data as File;
+                  _listenForImageSize(file);
+                  isLongImage = _isLongImage;
+                  themable = ThemableImage.image(
+                    file,
                     height: widget.height,
                     doTheme: (settings.themeRasterGraphics ||
                             override == ThemeOverride.Do) &&
@@ -174,37 +240,52 @@ class _MarkdownImageState extends State<MarkdownImage> {
                         dark,
                     bg: theme.canvasColor,
                   );
+
+                  if (isLongImage) {
+                    im = _buildFoldedImage(file, displayMaxWidth, theme);
+                  } else {
+                    im = Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: ConstrainedBox(
+                        constraints:
+                            BoxConstraints(maxWidth: displayMaxWidth),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: AlignmentDirectional.centerStart,
+                          child: themable,
+                        ),
+                      ),
+                    );
+                  }
                 }
 
-                Widget image = GestureDetector(
-                  behavior: widget.onToggleWidth != null
+                return GestureDetector(
+                  behavior: widget.onToggleWidth != null && !isLongImage
                       ? HitTestBehavior.opaque
                       : HitTestBehavior.deferToChild,
-                  onTap: widget.onToggleWidth ??
-                      () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => ImageDetails(
-                              im as ThemableImage,
-                              captionText(
-                                  context, widget.altText, widget.tooltip),
-                            ),
-                          ),
-                        );
-                      },
+                  onTap: isLongImage
+                      // Folded images always open the full screen viewer.
+                      ? () => _openDetails(context, themable)
+                      : widget.onToggleWidth ??
+                          () => _openDetails(context, themable),
                   child: im,
                 );
-
-                return image;
               }
 
-              return SizedBox(
+              // 图片源解析通常毫秒级（本地文件）：300ms 内完成就不闪指示器。
+              return DelayedLoadingGate(
+                loading: true,
+                builder: (context, showLoading) => SizedBox(
                   width: width,
                   height: widget.height,
-                  child: const Padding(
-                      padding: EdgeInsets.all(16),
-                      child: Center(child: CircularProgressIndicator())));
+                  child: showLoading
+                      ? const Padding(
+                          padding: EdgeInsets.all(16),
+                          child:
+                              Center(child: CircularProgressIndicator()))
+                      : null,
+                ),
+              );
             });
 
         if (shouldCaption(context, widget.altText, widget.tooltip)) {
@@ -222,6 +303,55 @@ class _MarkdownImageState extends State<MarkdownImage> {
         }
         return image;
       },
+    );
+  }
+
+  /// A 2:3 box (width:height) showing only the top of the long image, with
+  /// a badge in the bottom right corner. Tapping opens the full screen
+  /// viewer. The `|width` toggle keeps acting on the display constraint.
+  Widget _buildFoldedImage(
+      File file, double displayMaxWidth, ThemeData theme) {
+    return Stack(
+      children: [
+        SizedBox(
+          width: displayMaxWidth,
+          height: displayMaxWidth * 1.5,
+          child: ClipRect(
+            child: Image.file(
+              file,
+              fit: BoxFit.fitWidth,
+              alignment: Alignment.topCenter,
+            ),
+          ),
+        ),
+        Positioned(
+          right: 8,
+          bottom: 8,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface.withValues(alpha: 0.85),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              context.loc.widgetsLongImageBadge,
+              style: theme.textTheme.labelSmall,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _openDetails(BuildContext context, ThemableImage themable) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ImageDetails(
+          themable,
+          captionText(context, widget.altText, widget.tooltip),
+        ),
+      ),
     );
   }
 }

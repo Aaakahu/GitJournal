@@ -1641,6 +1641,42 @@ abstract class AppLocalizations {
   /// **'Live preview'**
   String get editorLivePreview;
 
+  /// No description provided for @editorMoodTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Mood'**
+  String get editorMoodTooltip;
+
+  /// No description provided for @editorMoodPickerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How are you feeling?'**
+  String get editorMoodPickerTitle;
+
+  /// No description provided for @selectionToolbarBold.
+  ///
+  /// In en, this message translates to:
+  /// **'Bold'**
+  String get selectionToolbarBold;
+
+  /// No description provided for @selectionToolbarItalic.
+  ///
+  /// In en, this message translates to:
+  /// **'Italic'**
+  String get selectionToolbarItalic;
+
+  /// No description provided for @selectionToolbarStrikethrough.
+  ///
+  /// In en, this message translates to:
+  /// **'Strikethrough'**
+  String get selectionToolbarStrikethrough;
+
+  /// No description provided for @selectionToolbarHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Heading'**
+  String get selectionToolbarHeading;
+
   /// No description provided for @editorsChecklistAdd.
   ///
   /// In en, this message translates to:
@@ -2132,6 +2168,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Code: {status} for {url}'**
   String widgetsImageRendererHttpError(Object status, Object url);
+
+  /// No description provided for @widgetsLongImageBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Long image'**
+  String get widgetsLongImageBadge;
 
   /// No description provided for @widgetsNoteDeleteDialogTitle.
   ///

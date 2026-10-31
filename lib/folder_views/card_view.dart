@@ -44,27 +44,29 @@ class CardView extends StatelessWidget {
       }
     }
 
-    StaggeredTile stagTile;
-    if (fixedHeight) {
-      stagTile = const StaggeredTile.extent(1, 200.0);
-    } else {
-      stagTile = const StaggeredTile.fit(1);
+    Widget buildTile(BuildContext context, int index) {
+      var note = folder.notes[index];
+      var tile = NoteTile(
+        note: note,
+        noteTapped: noteTapped,
+        noteLongPressed: noteLongPressed,
+        selected: isNoteSelected(note),
+        searchTerm: searchTerm,
+      );
+      if (fixedHeight) {
+        return StaggeredGridTile.extent(
+          crossAxisCellCount: 1,
+          mainAxisExtent: 200.0,
+          child: tile,
+        );
+      }
+      return StaggeredGridTile.fit(crossAxisCellCount: 1, child: tile);
     }
 
-    var gridView = SliverStaggeredGrid.extentBuilder(
-      itemCount: folder.notes.length,
-      itemBuilder: (BuildContext context, int index) {
-        var note = folder.notes[index];
-        return NoteTile(
-          note: note,
-          noteTapped: noteTapped,
-          noteLongPressed: noteLongPressed,
-          selected: isNoteSelected(note),
-          searchTerm: searchTerm,
-        );
-      },
+    var gridView = SliverMasonryGrid.extent(
+      itemBuilder: buildTile,
+      childCount: folder.notes.length,
       maxCrossAxisExtent: 180.0,
-      staggeredTileBuilder: (int i) => stagTile,
       mainAxisSpacing: 8.0,
       crossAxisSpacing: 8.0,
     );
