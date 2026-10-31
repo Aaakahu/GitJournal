@@ -5,18 +5,25 @@
  */
 
 import 'package:flutter/material.dart';
+import 'package:git_setup/screens.dart';
+import 'package:gitjournal/analytics/analytics.dart';
 import 'package:gitjournal/l10n.dart';
 import 'package:gitjournal/logger/logger.dart';
+import 'package:gitjournal/repository_manager.dart';
 import 'package:gitjournal/screens/home_screen.dart';
 import 'package:gitjournal/screens/memo_folders_screen.dart';
+import 'package:gitjournal/settings/settings_git_remote.dart';
 import 'package:gitjournal/settings/settings_screen.dart';
 import 'package:gitjournal/widgets/app_drawer_header.dart';
+import 'package:provider/provider.dart';
 
 class AppDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     var currentRoute = ModalRoute.of(context)!.settings.name;
     var divider = const Row(children: <Widget>[Expanded(child: Divider())]);
+    var repoManager = context.watch<RepositoryManager>();
+    var repo = repoManager.currentRepo;
 
     return Drawer(
       child: ListView(
@@ -38,6 +45,27 @@ class AppDrawer extends StatelessWidget {
             onTap: () => _navTopLevel(context, MemoFoldersScreen.routePath),
             selected: currentRoute == MemoFoldersScreen.routePath,
           ),
+          divider,
+          // Git 配置：完整的 SSH/HTTP 远端设置（1.90.4 入口恢复）。
+          _buildDrawerTile(
+            context,
+            icon: Icons.settings_remote,
+            title: context.loc.settingsGitRemoteTitle,
+            onTap: () => _navTopLevel(context, GitRemoteSettingsScreen.routePath),
+            selected: currentRoute == GitRemoteSettingsScreen.routePath,
+          ),
+          // 仓库尚未配置远端时，显示初始配置向导（SSH/HTTP 选择）。
+          if (repo?.remoteGitRepoConfigured == false)
+            _buildDrawerTile(
+              context,
+              icon: Icons.sync,
+              title: context.loc.drawerSetup,
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, GitHostSetupScreen.routePath);
+                logEvent(Event.DrawerSetupGitHost);
+              },
+            ),
           divider,
           _buildDrawerTile(
             context,
