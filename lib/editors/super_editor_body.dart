@@ -711,11 +711,22 @@ class SuperEditorBodyState extends State<SuperEditorBody>
         const menuWidth = _imageMenuWidth;
         const menuHeight = _imageMenuHeight;
         final padding = MediaQuery.paddingOf(entryContext);
+        final viewInsets = MediaQuery.viewInsetsOf(entryContext);
         final overlayWidth = overlayBox.size.width;
+        // 可视底边：根 Overlay 铺满整屏，键盘与系统底栏占掉的部分要让位。
+        final viewportBottom =
+            overlayBox.size.height - viewInsets.bottom - padding.bottom;
+        final topSafe = padding.top + _toolbarEdgeMargin;
         // 图片正上方；顶部放不下则落到图片下方。水平方向跟随图片，出屏则收回。
         var top = imageRect.top - menuHeight - _toolbarEdgeMargin;
-        if (top < padding.top + _toolbarEdgeMargin) {
+        if (top < topSafe) {
           top = imageRect.bottom + _toolbarEdgeMargin;
+        }
+        // 大图占满视口时上下都贴不到：菜单钉在视口内（底栏上方 8px），
+        // 必须完整可见可操作，而不是跟着图片掉到屏幕外。
+        if (top + menuHeight > viewportBottom) {
+          top = math.max(
+              topSafe, viewportBottom - menuHeight - _toolbarEdgeMargin);
         }
         var left = imageRect.center.dx - menuWidth / 2;
         left = left.clamp(
@@ -1105,20 +1116,25 @@ class _ImageSelectionMenu extends StatelessWidget {
                                 (GjImageAlign.right,
                                     Icons.format_align_right),
                               ])
-                                IconButton(
-                                  // 紧凑 32px：三个钮必须挤进菜单剩余的
-                                  // ~100px 宽度（默认 40px 会溢出）。
-                                  constraints: const BoxConstraints.tightFor(
-                                      width: 32, height: 32),
-                                  padding: EdgeInsets.zero,
-                                  icon: Icon(
-                                    entry.$2,
-                                    size: 20,
-                                    color: currentAlign == entry.$1
-                                        ? accent
-                                        : null,
+                                // Material 3 的 48px 最小点击目标会顶掉
+                                // IconButton 自带的 32px constraints（行内
+                                // 溢出 46px），外层 SizedBox 强制收紧。
+                                SizedBox(
+                                  width: 32,
+                                  height: 32,
+                                  child: IconButton(
+                                    constraints: const BoxConstraints.tightFor(
+                                        width: 32, height: 32),
+                                    padding: EdgeInsets.zero,
+                                    icon: Icon(
+                                      entry.$2,
+                                      size: 20,
+                                      color: currentAlign == entry.$1
+                                          ? accent
+                                          : null,
+                                    ),
+                                    onPressed: () => onAlignSet(entry.$1),
                                   ),
-                                  onPressed: () => onAlignSet(entry.$1),
                                 ),
                             ],
                           ),
@@ -1534,9 +1550,20 @@ class _GjImageComponentState extends State<GjImageComponent> {
     if (mounted) setState(() {});
   }
 
-  bool get _isLongImage {
+  /// 折叠判定：高/宽 > 3，或按当前显示宽度渲染后的高度超过视口可用高度
+  /// 约 1.5 倍（满屏大图遮死编辑区，真机反馈）。视口取 MediaQuery 屏幕
+  /// 尺寸减系统上下边距——滚动方向的 LayoutBuilder 约束是无穷大，不稳。
+  /// 普通竖拍照片（高/宽 1.3~2）在手机列宽下渲染高度远小于 1.5 倍视口，
+  /// 不会折叠。
+  bool _isFoldWorthy(double displayMaxWidth) {
     final image = _decodedImage;
-    return image != null && image.height > image.width * 3;
+    if (image == null) return false;
+    if (image.height > image.width * 3) return true;
+
+    final media = MediaQuery.of(context);
+    final viewportHeight = media.size.height - media.padding.vertical;
+    final renderedHeight = displayMaxWidth * image.height / image.width;
+    return renderedHeight > viewportHeight * 1.5;
   }
 
   ImageProvider? _resolveImageProvider(String imagePath) {
@@ -1594,7 +1621,7 @@ class _GjImageComponentState extends State<GjImageComponent> {
 
       final provider = _resolveImageProvider(imagePath);
       _listenForImageSize(imagePath, provider);
-      final isLongImage = _isLongImage;
+      final isLongImage = _isFoldWorthy(displayMaxWidth);
 
       final content = isLongImage
           ? _buildFoldedImage(provider!, displayMaxWidth, theme)

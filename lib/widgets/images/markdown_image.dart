@@ -112,9 +112,18 @@ class _MarkdownImageState extends State<MarkdownImage> {
     super.dispose();
   }
 
-  bool get _isLongImage {
+  /// 折叠判定：高/宽 > 3，或按当前显示宽度渲染后的高度超过视口可用高度
+  /// 约 1.5 倍（满屏大图遮死编辑区，真机反馈）。视口取 MediaQuery 屏幕
+  /// 尺寸减系统上下边距；普通竖拍照片（高/宽 1.3~2）不会折叠。
+  bool _isFoldWorthy(double displayMaxWidth) {
     final image = _decodedImage;
-    return image != null && image.height > image.width * 3;
+    if (image == null) return false;
+    if (image.height > image.width * 3) return true;
+
+    final media = MediaQuery.of(context);
+    final viewportHeight = media.size.height - media.padding.vertical;
+    final renderedHeight = displayMaxWidth * image.height / image.width;
+    return renderedHeight > viewportHeight * 1.5;
   }
 
   @override
@@ -236,7 +245,7 @@ class _MarkdownImageState extends State<MarkdownImage> {
                 } else {
                   final file = snapshot.data as File;
                   _listenForImageSize(file);
-                  isLongImage = _isLongImage;
+                  isLongImage = _isFoldWorthy(displayMaxWidth);
                   themable = ThemableImage.image(
                     file,
                     height: widget.height,

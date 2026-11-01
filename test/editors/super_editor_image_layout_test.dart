@@ -135,4 +135,79 @@ void main() {
 
     expect(find.byType(InteractiveViewer), findsOneWidget);
   });
+
+  testWidgets('image menu stays inside the viewport when the image fills '
+      'the screen', (tester) async {
+    // 高/宽 2:1 的满宽大图：渲染高度 768x2 = 1536，远超 600 高的窗口，
+    // 图片上下都贴不到。菜单必须钉在视口内（底栏上方 8px）而不是落到
+    // 屏幕外（真机反馈：只看得到"查看大图"一行）。
+    tester.view.physicalSize = const Size(800, 600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    var fileName = writePng('tall.png', 400, 800); // ratio 2:1, below 3:1
+
+    await pumpEditor(tester, '![tall]($fileName)');
+
+    await tester.longPress(find.byType(GjImageComponent));
+    await tester.pumpAndSettle();
+
+    final menuFinder = find.byWidgetPredicate(
+      (w) => w.runtimeType.toString() == '_ImageSelectionMenu',
+    );
+    expect(menuFinder, findsOneWidget);
+
+    final menuRect = tester.getRect(menuFinder);
+    expect(menuRect.top, greaterThanOrEqualTo(0.0));
+    expect(menuRect.bottom, lessThanOrEqualTo(600.0));
+    expect(menuRect.left, greaterThanOrEqualTo(0.0));
+    expect(menuRect.right, lessThanOrEqualTo(800.0));
+  });
+
+  testWidgets('a 2:1 image whose rendered height exceeds 1.5x the viewport '
+      'folds even though it is below the 3:1 ratio', (tester) async {
+    // 折叠阈值扩展：高/宽 2:1 不满旧阈值 3，但满宽渲染 768x1536 超过
+    // 1.5 倍视口（600 高）→ 折叠，避免满屏大图遮死编辑区。
+    tester.view.physicalSize = const Size(800, 600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    var fileName = writePng('tall.png', 400, 800); // ratio 2:1
+
+    await pumpEditor(tester, '![tall]($fileName)');
+
+    expect(
+      find.byWidgetPredicate(
+        (w) =>
+            w is SizedBox &&
+            w.width == 768.0 &&
+            w.height == 1152.0 &&
+            w.child is ClipRect,
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Long image'), findsOneWidget);
+  });
+
+  testWidgets('normal portrait photos (ratio 1.5) never fold at phone-like '
+      'proportions', (tester) async {
+    // 红线：普通竖拍照片（高/宽 1.3~2）不折叠。手机比例窗口
+    // （列宽 ~368，视口 900）下渲染高度 552 远小于 1.5 倍视口。
+    tester.view.physicalSize = const Size(400, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    var fileName = writePng('photo.png', 400, 600); // ratio 1.5
+
+    await pumpEditor(tester, '![photo]($fileName)');
+
+    // 折叠盒若存在会是 SizedBox(368x552, ClipRect)——即列宽 x 1.5 倍列宽。
+    expect(
+      find.byWidgetPredicate(
+        (w) => w is SizedBox && w.width == 368.0 && w.height == 552.0,
+      ),
+      findsNothing,
+    );
+    expect(find.text('Long image'), findsNothing);
+  });
 }

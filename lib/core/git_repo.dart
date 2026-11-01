@@ -18,7 +18,7 @@ import 'package:gitjournal/settings/git_config.dart';
 import 'package:gitjournal/utils/git_desktop.dart';
 import 'package:go_git_dart/go_git_dart_async.dart';
 import 'package:path/path.dart' as p;
-import 'package:universal_io/io.dart' show Platform;
+import 'package:universal_io/io.dart' show Directory, Platform;
 
 class GitNoteRepository {
   final String gitRepoPath;
@@ -31,6 +31,11 @@ class GitNoteRepository {
   }) : messageBuilder = CommitMessageBuilder();
 
   Future<void> _add(String pathSpec) async {
+    // `git add('.')` 会让 dart_git 列举工作区目录；目录物理缺失（重配时
+    // 克隆被中断、目录被 clone 流程删除后未重建）时直接抛
+    // PathNotFoundException（"Directory listing failed"），在编辑页变成
+    // 错误卡片/保存失败。只补建目录，绝不动已有内容。
+    ensureGitWorkDir(gitRepoPath);
     var repo = await GitAsyncRepository.load(gitRepoPath);
     await repo.add(pathSpec);
   }
@@ -253,6 +258,16 @@ class GitNoteRepository {
       Log.e("numChanges", ex: ex, stacktrace: st);
       return null;
     }
+  }
+}
+
+/// 确保 Git 仓库工作区目录存在：登记过的仓库目录可能物理缺失（克隆被
+/// 中断、清数据重配），任何列目录的操作都会抛 PathNotFoundException。
+/// 只补建目录，绝不删除/清空已有内容。
+void ensureGitWorkDir(String repoPath) {
+  var dir = Directory(repoPath);
+  if (!dir.existsSync()) {
+    dir.createSync(recursive: true);
   }
 }
 

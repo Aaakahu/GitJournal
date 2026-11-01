@@ -101,6 +101,15 @@ class ErrorScreen extends StatelessWidget {
       drawer: AppDrawer(),
       appBar: AppBar(
         title: Text(context.loc.screensErrorTitle),
+        // 错误屏曾被叠在其他页面之上时给一个可点的关闭/返回出口；
+        // 作为初始路由（仓库加载失败）时保留恢复按钮，不给误触返回。
+        leading: Navigator.of(context).canPop()
+            ? IconButton(
+                icon: const Icon(Icons.close),
+                tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+                onPressed: () => Navigator.of(context).pop(),
+              )
+            : null,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),

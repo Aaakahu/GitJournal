@@ -146,6 +146,13 @@ class GitJournalRepo with ChangeNotifier {
     var repoPath = await storageConfig.buildRepoPath(gitBaseDir);
     Log.i("Loading Repo at path $repoPath");
 
+    // 单一收口点：登记过的仓库目录可能物理缺失（重配时克隆被中断，目录
+    // 被 clone 流程删除后未重建）。不补建的话，后续所有列目录——notes
+    // 文件夹加载、git add('.') 的 dart_git 工作区列举——都会抛
+    // PathNotFoundException（"Directory listing failed"）变成错误卡片。
+    // 只补建目录，绝不动已有内容。
+    ensureGitWorkDir(repoPath);
+
     var repoDir = io.Directory(repoPath);
 
     if (!repoDir.existsSync()) {
@@ -168,7 +175,7 @@ class GitJournalRepo with ChangeNotifier {
     var remoteConfigured = repo.config.remotes.isNotEmpty;
 
     if (!storageConfig.storeInternally) {
-      await _commitUnTrackedChanges(repo, gitConfig);
+      await _commitUnTrackedChanges(repo, gitConfig, repoPath: repoPath);
     }
 
     await io.Directory(cacheDir).create(recursive: true);
@@ -280,7 +287,7 @@ class GitJournalRepo with ChangeNotifier {
       } on FileStorageCacheIncomplete catch (ex) {
         Log.i("FileStorageCacheIncomplete ${ex.path}");
         var repo = await GitAsyncRepository.load(repoPath);
-        await _commitUnTrackedChanges(repo, gitConfig);
+        await _commitUnTrackedChanges(repo, gitConfig, repoPath: repoPath);
         await _resetFileStorage();
         return;
       }
@@ -327,7 +334,7 @@ class GitJournalRepo with ChangeNotifier {
     if (_shouldCheckForChanges()) {
       try {
         var repo = await GitAsyncRepository.load(repoPath);
-        await _commitUnTrackedChanges(repo, gitConfig);
+        await _commitUnTrackedChanges(repo, gitConfig, repoPath: repoPath);
       } catch (ex, st) {
         Log.e("SyncNotes Failed to Load Repo", ex: ex, stacktrace: st);
         return;
@@ -871,7 +878,13 @@ class GitJournalRepo with ChangeNotifier {
 }
 
 Future<void> _copyDirectory(String source, String destination) async {
-  await for (var entity in io.Directory(source).list(recursive: false)) {
+  var srcDir = io.Directory(source);
+  if (!srcDir.existsSync()) {
+    // 源目录缺失（历史遗留的登记目录）：补建空目录后无可拷贝，直接返回。
+    srcDir.createSync(recursive: true);
+    return;
+  }
+  await for (var entity in srcDir.list(recursive: false)) {
     if (entity is io.Directory) {
       var newDirectory = io.Directory(p.join(
           io.Directory(destination).absolute.path, p.basename(entity.path)));
@@ -890,6 +903,8 @@ Future<void> _ensureOneCommitInRepo({
   required GitConfig config,
 }) async {
   try {
+    // 目录缺失（克隆中断）时 list() 抛 PathNotFoundException，先补建。
+    ensureGitWorkDir(repoPath);
     var dirList = await io.Directory(repoPath).list().toList();
     var anyFileInRepo = dirList.firstWhereOrNull(
       (fs) => fs.statSync().type == io.FileSystemEntityType.file,
@@ -915,11 +930,14 @@ Future<void> _ensureOneCommitInRepo({
 }
 
 Future<void> _commitUnTrackedChanges(
-    GitAsyncRepository repo, GitConfig gitConfig) async {
+    GitAsyncRepository repo, GitConfig gitConfig,
+    {required String repoPath}) async {
   var timer = Stopwatch()..start();
   //
   // Check for un-committed files and save them
   //
+  // add('.') 列举工作区目录，目录缺失会抛 PathNotFoundException，先补建。
+  ensureGitWorkDir(repoPath);
   await repo.add('.');
 
   try {

@@ -183,7 +183,16 @@ Future<void> cloneRemotePluggable({
 }
 
 Future<bool> _repoIsEmpty(repoPath) async {
-  var entities = Directory(repoPath).listSync();
+  var dir = Directory(repoPath);
+  if (!dir.existsSync()) {
+    // 上一次克隆中断会把目录留在"已删除未重建"的状态（clone 前
+    // deleteSync），这里 listSync 直接抛 PathNotFoundException，变成
+    // "失败 ..."错误页卡死重配流程。补建空目录，让本次克隆正常走起。
+    dir.createSync(recursive: true);
+    return true;
+  }
+
+  var entities = dir.listSync();
   if (entities.length == 1) {
     if (p.basename(entities[0].path) == '.git') {
       return true;

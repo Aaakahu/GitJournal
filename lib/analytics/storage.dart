@@ -96,6 +96,11 @@ class AnalyticsStorage {
     var paths = <String>[];
 
     var dir = Directory(folderPath);
+    if (!dir.existsSync()) {
+      // 目录缺失时 list() 抛 PathNotFoundException；补建空目录，无事件。
+      dir.createSync(recursive: true);
+      return paths;
+    }
     await for (var entity in dir.list()) {
       if (entity is! File) {
         assert(false, "Analytics directory contains non Files");
