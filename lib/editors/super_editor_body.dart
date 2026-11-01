@@ -576,6 +576,10 @@ class SuperEditorBodyState extends State<SuperEditorBody>
     final nodeId = _imageSelection.selectedNodeId.value;
     if (nodeId == null || !mounted) return;
 
+    // 选中图片时收起键盘并清除文字选区：光标停止闪烁、输入法面板收起，
+    // 注意力完整交给玻璃菜单（真机反馈：菜单呼出后键盘不收、光标仍闪）。
+    FocusManager.instance.primaryFocus?.unfocus();
+    _editor.execute(const [ClearSelectionRequest()]);
     final fade = _imageMenuFade;
     if (_imageMenuEntry != null && fade != null) {
       // Switching to another long-pressed image: just reposition.
