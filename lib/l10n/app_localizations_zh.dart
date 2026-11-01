@@ -1425,6 +1425,18 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get imageToggleSkippedSmall => '图片小于缩略图宽度，无需切换显示大小';
+
+  @override
+  String get imageViewLarge => '查看大图';
+
+  @override
+  String get imageMenuSize => '显示大小';
+
+  @override
+  String get imageMenuDelete => '删除';
+
+  @override
+  String get imageMenuClose => '关闭';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -2848,6 +2860,18 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get imageToggleSkippedSmall => '图片小于缩略图宽度，无需切换显示大小';
+
+  @override
+  String get imageViewLarge => '查看大图';
+
+  @override
+  String get imageMenuSize => '显示大小';
+
+  @override
+  String get imageMenuDelete => '删除';
+
+  @override
+  String get imageMenuClose => '关闭';
 }
 
 /// The translations for Chinese, as used in Taiwan (`zh_TW`).

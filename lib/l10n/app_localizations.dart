@@ -2822,6 +2822,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Image is smaller than the thumbnail width - no size change to toggle'**
   String get imageToggleSkippedSmall;
+
+  /// No description provided for @imageViewLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'View full image'**
+  String get imageViewLarge;
+
+  /// No description provided for @imageMenuSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Image size'**
+  String get imageMenuSize;
+
+  /// No description provided for @imageMenuDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get imageMenuDelete;
+
+  /// No description provided for @imageMenuClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get imageMenuClose;
 }
 
 class _AppLocalizationsDelegate

@@ -194,7 +194,7 @@ class MarkdownEditorState extends State<MarkdownEditor>
         imageDir: p.join(_note.repoPath, _note.parent.folderPath),
         autofocus: widget.editMode,
         onChanged: _richTextChanged,
-        onImageWidthChange: _onRichImageWidthChange,
+        onImageWidthSet: _onRichImageWidthSet,
       );
     } else {
       bodyEditor = NoteBodyEditor(
@@ -376,18 +376,18 @@ class MarkdownEditorState extends State<MarkdownEditor>
     notifyListeners();
   }
 
-  /// Toggles the `|240` thumbnail suffix of the imageIndex-th image markup in
-  /// the body. The document-order index of the image node matches the order of
-  /// the image markups in the text because the rich editor is only active
-  /// for bodies that round-trip exactly.
-  void _onRichImageWidthChange(int imageIndex) {
+  /// Sets (or clears) the `|N` width suffix of the imageIndex-th image
+  /// markup in the body. The document-order index of the image node matches
+  /// the order of the image markups in the text because the rich editor is
+  /// only active for bodies that round-trip exactly.
+  void _onRichImageWidthSet(int imageIndex, double? widthOrNull) {
     // Sync any debounced document serialization first, so the markup indexes
     // match the document the user sees.
     _richBodyEditorKey.currentState?.flushPendingWrite();
     var matches = imageMarkupRegex.allMatches(_textController.text).toList();
     if (imageIndex >= matches.length) return;
     var match = matches[imageIndex];
-    _onImageMarkupToggled(match.start, match.end);
+    _onImageWidthSet(match.start, match.end, widthOrNull);
   }
 
   void _noteTextChanged() {
@@ -565,6 +565,40 @@ class MarkdownEditorState extends State<MarkdownEditor>
     var newMarkup = match.group(3) != null
         ? '![${match.group(1)}](${match.group(2)})'
         : '![${match.group(1)}](${match.group(2)}|$gjImageThumbnailWidth)';
+
+    int adjustOffset(int offset) {
+      if (offset <= start) return offset;
+      if (offset >= end) return offset + newMarkup.length - markup.length;
+      return start;
+    }
+
+    var selection = _textController.selection;
+    setState(() {
+      _textController.value = TextEditingValue(
+        text: text.replaceRange(start, end, newMarkup),
+        selection: TextSelection(
+          baseOffset: adjustOffset(selection.baseOffset),
+          extentOffset: adjustOffset(selection.extentOffset),
+        ),
+      );
+      _noteModified = true;
+    });
+  }
+
+  /// Rewrites exactly the image markup between [start] and [end]: sets the
+  /// `|N` width suffix to [widthOrNull] (appended when the markup has none),
+  /// or removes the suffix on null (full column width). Not tracked by the
+  /// undo stack - resizing an image isn't undoable.
+  void _onImageWidthSet(int start, int end, double? widthOrNull) {
+    var text = _textController.text;
+    if (start < 0 || end > text.length || start >= end) return;
+
+    var markup = text.substring(start, end);
+    var match = imageMarkupRegex.firstMatch(markup);
+    if (match == null) return;
+    var newMarkup = widthOrNull == null
+        ? '![${match.group(1)}](${match.group(2)})'
+        : '![${match.group(1)}](${match.group(2)}|${widthOrNull.round()})';
 
     int adjustOffset(int offset) {
       if (offset <= start) return offset;

@@ -447,5 +447,9 @@
   "exportRepo": "导出仓库",
   "shareAsZip": "以 ZIP 文件分享",
   "failedToExport": "导出失败",
-  "imageToggleSkippedSmall": "图片小于缩略图宽度，无需切换显示大小"
+  "imageToggleSkippedSmall": "图片小于缩略图宽度，无需切换显示大小",
+  "imageViewLarge": "查看大图",
+  "imageMenuSize": "显示大小",
+  "imageMenuDelete": "删除",
+  "imageMenuClose": "关闭"
 }

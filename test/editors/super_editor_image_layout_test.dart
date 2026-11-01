@@ -108,13 +108,29 @@ void main() {
     expect(find.text('Long image'), findsOneWidget);
   });
 
-  testWidgets('tapping a folded image opens the full screen viewer',
-      (tester) async {
+  testWidgets('a folded image is viewed full screen through the long-press '
+      'menu (tap is a no-op)', (tester) async {
     var fileName = writePng('long.png', 60, 300);
+
+    // 折叠盒是 768x1152，默认 800x600 的窗口放不下菜单；加高窗口。
+    tester.view.physicalSize = const Size(800, 2000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
 
     await pumpEditor(tester, '![long]($fileName)');
 
+    // 单击无操作：不弹全屏、不弹菜单。
     await tester.tap(find.byType(GjImageComponent));
+    await tester.pumpAndSettle();
+    expect(find.byType(InteractiveViewer), findsNothing);
+    expect(find.byIcon(Icons.zoom_out_map), findsNothing);
+
+    // 长按 → 菜单 → 查看大图 → 全屏查看器。
+    await tester.longPress(find.byType(GjImageComponent));
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.zoom_out_map), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.zoom_out_map));
     await tester.pumpAndSettle();
 
     expect(find.byType(InteractiveViewer), findsOneWidget);

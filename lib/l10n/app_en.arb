@@ -540,5 +540,9 @@
   "exportRepo": "Export Repository",
   "shareAsZip": "Share as a ZIP file",
   "failedToExport": "Failed to Export",
-  "imageToggleSkippedSmall": "Image is smaller than the thumbnail width - no size change to toggle"
+  "imageToggleSkippedSmall": "Image is smaller than the thumbnail width - no size change to toggle",
+  "imageViewLarge": "View full image",
+  "imageMenuSize": "Image size",
+  "imageMenuDelete": "Delete",
+  "imageMenuClose": "Close"
 }

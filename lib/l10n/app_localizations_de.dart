@@ -1496,4 +1496,16 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get imageToggleSkippedSmall =>
       'Image is smaller than the thumbnail width - no size change to toggle';
+
+  @override
+  String get imageViewLarge => 'View full image';
+
+  @override
+  String get imageMenuSize => 'Image size';
+
+  @override
+  String get imageMenuDelete => 'Delete';
+
+  @override
+  String get imageMenuClose => 'Close';
 }

@@ -6,10 +6,12 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'package:flutter/gestures.dart' show kTouchSlop;
 import 'package:flutter/material.dart';
 import 'package:gitjournal/app/theme/expressive_motion.dart';
 import 'package:gitjournal/l10n.dart';
 import 'package:gitjournal/markdown/gj_markdown_serializers.dart';
+import 'package:gitjournal/themes/glass_theme.dart';
 import 'package:gitjournal/utils/markdown.dart';
 import 'package:gitjournal/widgets/expressive_image_frame.dart';
 import 'package:path/path.dart' as p;
@@ -38,9 +40,11 @@ class SuperEditorBody extends StatefulWidget {
   final bool autofocus;
   final VoidCallback onChanged;
 
-  /// Called with the document-order index of the tapped image node. The
-  /// parent toggles the `|240` thumbnail suffix in the markdown text.
-  final void Function(int imageIndex)? onImageWidthChange;
+  /// Called with the document-order index of the selected image node and the
+  /// new display width, so the parent can precisely rewrite that markup's
+  /// `|N` suffix (append when absent, remove on null - null means "full
+  /// column width").
+  final void Function(int imageIndex, double? widthOrNull)? onImageWidthSet;
 
   const SuperEditorBody({
     super.key,
@@ -48,7 +52,7 @@ class SuperEditorBody extends StatefulWidget {
     required this.imageDir,
     required this.autofocus,
     required this.onChanged,
-    this.onImageWidthChange,
+    this.onImageWidthSet,
   });
 
   @override
@@ -76,9 +80,17 @@ class SuperEditorBodyState extends State<SuperEditorBody>
   AnimationController? _toolbarFade;
   ScrollableState? _trackedScrollable;
 
+  // 长按选中图片的状态（苹果备忘录式交互）。见 _showImageMenu。
+  final _ImageSelection _imageSelection = _ImageSelection();
+  OverlayEntry? _imageMenuEntry;
+  AnimationController? _imageMenuFade;
+  bool _imageReloadPending = false;
+
   @override
   void initState() {
     super.initState();
+    _imageSelection.onSelectRequest = _showImageMenu;
+    _imageSelection.previewWidth.addListener(_onImageSelectionVisualChange);
     _loadDocument(widget.textController.text, initial: true);
     widget.textController.addListener(_onControllerChanged);
   }
@@ -101,6 +113,9 @@ class SuperEditorBodyState extends State<SuperEditorBody>
   void didUpdateWidget(SuperEditorBody oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.textController != widget.textController) {
+      // The document is reloaded from the new controller below; a pending
+      // image selection points at node ids that no longer exist.
+      _hideImageMenu(reload: false);
       oldWidget.textController.removeListener(_onControllerChanged);
       widget.textController.addListener(_onControllerChanged);
       _loadDocument(widget.textController.text);
@@ -114,6 +129,10 @@ class SuperEditorBodyState extends State<SuperEditorBody>
     _toolbarEntry = null;
     _toolbarFade?.dispose();
     _toolbarFade = null;
+    _imageMenuEntry?.remove();
+    _imageMenuEntry = null;
+    _imageMenuFade?.dispose();
+    _imageMenuFade = null;
     _debounceTimer?.cancel();
     widget.textController.removeListener(_onControllerChanged);
     _editor.dispose();
@@ -300,6 +319,13 @@ class SuperEditorBodyState extends State<SuperEditorBody>
 
   void _onControllerChanged() {
     if (_writingToController) return;
+    // 图片选中期间（含滑块写回的瞬间），生命周期震荡等外部控制器写入不触发
+    // 整篇重载——那会打散选中和菜单。先欠着，退出选中时统一比对补载。
+    if (_imageSelection.selectedNodeId.value != null ||
+        _imageMenuEntry != null) {
+      _imageReloadPending = true;
+      return;
+    }
     // External change (image insertion, undo, search): reload everything.
     // v1: this resets the caret to the start of the document.
     _loadDocument(widget.textController.text);
@@ -311,7 +337,7 @@ class SuperEditorBodyState extends State<SuperEditorBody>
 
     return GjImageScope(
       imageDir: widget.imageDir,
-      onImageWidthChange: _onImageWidthChange,
+      selection: _imageSelection,
       child: SuperEditor(
         editor: _editor,
         autofocus: widget.autofocus,
@@ -328,13 +354,13 @@ class SuperEditorBodyState extends State<SuperEditorBody>
     );
   }
 
-  void _onImageWidthChange(String nodeId) {
+  void _onImageWidthSet(String nodeId, double? widthOrNull) {
     final nodes = _document.toList(growable: false);
     var imageIndex = 0;
     for (final node in nodes) {
       if (node is! ImageNode) continue;
       if (node.id == nodeId) {
-        widget.onImageWidthChange?.call(imageIndex);
+        widget.onImageWidthSet?.call(imageIndex, widthOrNull);
         return;
       }
       imageIndex++;
@@ -362,12 +388,12 @@ class SuperEditorBodyState extends State<SuperEditorBody>
     final layout = _documentLayoutKey.currentState as DocumentLayout?;
     if (layout == null) return null;
 
-    final rect =
-        layout.getRectForSelection(selection.base, selection.extent);
+    final rect = layout.getRectForSelection(selection.base, selection.extent);
     if (rect == null) return null;
 
     final topLeft = layout.getGlobalOffsetFromDocumentOffset(rect.topLeft);
-    final bottomRight = layout.getGlobalOffsetFromDocumentOffset(rect.bottomRight);
+    final bottomRight =
+        layout.getGlobalOffsetFromDocumentOffset(rect.bottomRight);
     return Rect.fromLTRB(
       topLeft.dx,
       topLeft.dy,
@@ -385,11 +411,15 @@ class SuperEditorBodyState extends State<SuperEditorBody>
     }
   }
 
-  /// Selection moved or content scrolled: reposition the visible toolbar.
+  /// Selection moved or content scrolled: reposition the visible toolbar /
+  /// image menu.
   void _onSelectionVisualChange() {
     if (!mounted) return;
     if (_toolbarEntry != null) {
       _toolbarEntry!.markNeedsBuild();
+    }
+    if (_imageMenuEntry != null) {
+      _imageMenuEntry!.markNeedsBuild();
     }
   }
 
@@ -518,8 +548,7 @@ class SuperEditorBodyState extends State<SuperEditorBody>
     for (final node
         in _editor.document.getNodesInside(selection.base, selection.extent)) {
       if (node is! ParagraphNode) continue;
-      final isHeader =
-          node.getMetadataValue('blockType') == header1Attribution;
+      final isHeader = node.getMetadataValue('blockType') == header1Attribution;
       requests.add(ChangeParagraphBlockTypeRequest(
         nodeId: node.id,
         blockType: isHeader ? paragraphAttribution : header1Attribution,
@@ -528,6 +557,441 @@ class SuperEditorBodyState extends State<SuperEditorBody>
     if (requests.isNotEmpty) {
       _editor.execute(requests);
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // 图片长按选中（苹果备忘录式）：长按图片 → 图片加账本黄描边 + 四角圆点手柄，
+  // 并在图片正上方浮出玻璃菜单（查看大图 / 显示大小滑块 / 删除）。复用批次三
+  // SelectionFormatToolbar 的 Overlay 定位骨架（跟随滚动、顶部放不下落到底部）。
+  // ---------------------------------------------------------------------------
+
+  /// Marks the overlay entry for rebuild so the menu follows the image on
+  /// scroll. The component side pushes the change.
+  void _onImageSelectionVisualChange() {
+    if (!mounted) return;
+    _imageMenuEntry?.markNeedsBuild();
+  }
+
+  void _showImageMenu() {
+    final nodeId = _imageSelection.selectedNodeId.value;
+    if (nodeId == null || !mounted) return;
+
+    final fade = _imageMenuFade;
+    if (_imageMenuEntry != null && fade != null) {
+      // Switching to another long-pressed image: just reposition.
+      _imageMenuEntry!.markNeedsBuild();
+      if (fade.status != AnimationStatus.forward &&
+          fade.status != AnimationStatus.completed) {
+        fade.forward();
+      }
+      return;
+    }
+
+    final controller = AnimationController(
+      vsync: this,
+      duration: ExpressiveMotion.duration(context, ExpressiveMotion.medium),
+    );
+    controller.value = controller.duration == Duration.zero ? 1 : 0;
+    if (controller.value == 0) controller.forward();
+    _imageMenuFade = controller;
+
+    final entry = OverlayEntry(
+      builder: (entryContext) {
+        final globalRect = _imageSelection.rect();
+        if (globalRect == null) return const SizedBox.shrink();
+
+        final overlayBox =
+            Overlay.of(entryContext).context.findRenderObject() as RenderBox?;
+        if (overlayBox == null || !overlayBox.attached) {
+          return const SizedBox.shrink();
+        }
+        Offset toOverlay(Offset o) => overlayBox.globalToLocal(o);
+        final imageRect = Rect.fromLTRB(
+          toOverlay(globalRect.topLeft).dx,
+          toOverlay(globalRect.topLeft).dy,
+          toOverlay(globalRect.bottomRight).dx,
+          toOverlay(globalRect.bottomRight).dy,
+        );
+
+        const menuWidth = _imageMenuWidth;
+        const menuHeight = _imageMenuHeight;
+        final padding = MediaQuery.paddingOf(entryContext);
+        final overlayWidth = overlayBox.size.width;
+        // 图片正上方；顶部放不下则落到图片下方。水平方向跟随图片，出屏则收回。
+        var top = imageRect.top - menuHeight - _toolbarEdgeMargin;
+        if (top < padding.top + _toolbarEdgeMargin) {
+          top = imageRect.bottom + _toolbarEdgeMargin;
+        }
+        var left = imageRect.center.dx - menuWidth / 2;
+        left = left.clamp(
+            _toolbarEdgeMargin,
+            math.max(_toolbarEdgeMargin,
+                overlayWidth - menuWidth - _toolbarEdgeMargin));
+        final menuRect = Rect.fromLTWH(left, top, menuWidth, menuHeight);
+
+        return Positioned.fill(
+          child: _ImageMenuDismissListener(
+            menuRect: menuRect,
+            imageRect: imageRect,
+            onDismiss: _hideImageMenu,
+            child: Stack(
+              children: [
+                Positioned(
+                  left: left,
+                  top: top,
+                  child: FadeTransition(
+                    opacity: CurvedAnimation(
+                      parent: controller,
+                      curve: ExpressiveMotion.effects,
+                    ),
+                    child: _ImageSelectionMenu(
+                      sliderMin: _imageSelection.columnWidth * 0.25,
+                      sliderMax: _imageSelection.columnWidth,
+                      sliderValue: (_imageSelection.previewWidth.value ??
+                              _imageSelection.currentWidth)
+                          .clamp(_imageSelection.columnWidth * 0.25,
+                              _imageSelection.columnWidth),
+                      onView: _viewSelectedImageFullScreen,
+                      onDelete: _deleteSelectedImage,
+                      onClose: () => _hideImageMenu(),
+                      onSliderChanged: (value) =>
+                          _imageSelection.previewWidth.value = value,
+                      onSliderCommit: _commitImageWidth,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    _imageMenuEntry = entry;
+    Overlay.of(context).insert(entry);
+  }
+
+  /// Closes the image selection. While a selection was active, controller
+  /// changes were deferred ([_imageReloadPending]); if any piled up (lifecycle
+  /// save storms, the slider write-back), catch up with one document reload.
+  void _hideImageMenu({bool reload = true}) {
+    final entry = _imageMenuEntry;
+    final fade = _imageMenuFade;
+    _imageMenuEntry = null;
+    _imageMenuFade = null;
+    _imageSelection.clear();
+    entry?.remove();
+    fade?.dispose();
+
+    if (reload && mounted && _imageReloadPending) {
+      _imageReloadPending = false;
+      _loadDocument(widget.textController.text);
+    }
+  }
+
+  /// Slider onChangeEnd: hand the new width to the parent for a precise
+  /// markup rewrite of just this image. Dragging to the full column width
+  /// removes the `|N` suffix entirely (full width is device-independent;
+  /// hardcoding a desktop column width into the note isn't).
+  void _commitImageWidth(double width) {
+    final nodeId = _imageSelection.selectedNodeId.value;
+    if (nodeId == null) return;
+
+    // 预览宽度保留到退出选中：文档要等控制器写回 + 选中期保护解除后才会
+    // 重载，先撤预览会让图片跳回旧宽度。
+    _imageSelection.previewWidth.value = width;
+    final full = width >= _imageSelection.columnWidth - 0.5;
+    _onImageWidthSet(nodeId, full ? null : width);
+    _imageReloadPending = true;
+  }
+
+  void _viewSelectedImageFullScreen() {
+    final provider = _imageSelection.provider;
+    if (provider == null) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute<void>(
+        builder: (context) => _FullScreenImageViewer(image: provider),
+      ),
+    );
+  }
+
+  /// Deletes the selected image node. The document serializer (debounced
+  /// write-back) removes exactly that markup from the body; the image file
+  /// itself stays on disk (the 90-day cleaner owns it).
+  void _deleteSelectedImage() {
+    final nodeId = _imageSelection.selectedNodeId.value;
+    if (nodeId == null) return;
+    _hideImageMenu(reload: false);
+    _editor.execute([DeleteNodeRequest(nodeId: nodeId)]);
+  }
+}
+
+const _imageMenuWidth = 240.0;
+const _imageMenuHeight = 128.0;
+
+/// Mutable state of the long-press image selection, shared with the
+/// [GjImageComponent]s through [GjImageScope].
+class _ImageSelection {
+  final selectedNodeId = ValueNotifier<String?>(null);
+
+  /// Live slider preview width for the selected image (logical px).
+  final previewWidth = ValueNotifier<double?>(null);
+
+  Rect? Function()? rectGetter;
+  ImageProvider? provider;
+  double columnWidth = 0;
+  double currentWidth = 0;
+
+  /// Set by [SuperEditorBodyState]; fires the menu/selection flow.
+  VoidCallback? onSelectRequest;
+
+  bool get isActive => selectedNodeId.value != null;
+
+  Rect? rect() => rectGetter?.call();
+
+  void requestSelect({
+    required String nodeId,
+    required Rect? Function() rectGetter,
+    required double columnWidth,
+    required double currentWidth,
+    ImageProvider? provider,
+  }) {
+    this.rectGetter = rectGetter;
+    this.columnWidth = columnWidth;
+    this.currentWidth = currentWidth;
+    this.provider = provider;
+    if (selectedNodeId.value != nodeId) {
+      previewWidth.value = null;
+    }
+    selectedNodeId.value = nodeId;
+    onSelectRequest?.call();
+  }
+
+  void clear() {
+    selectedNodeId.value = null;
+    previewWidth.value = null;
+    rectGetter = null;
+    provider = null;
+  }
+}
+
+/// Dismisses the image menu when the user taps outside the menu and the
+/// selected image. Plain [Listener] + translucent behavior: drags still
+/// reach the scroll view (scrolling keeps the menu), taps select text in
+/// the editor below as usual.
+class _ImageMenuDismissListener extends StatefulWidget {
+  final Rect menuRect;
+  final Rect imageRect;
+  final VoidCallback onDismiss;
+  final Widget child;
+
+  const _ImageMenuDismissListener({
+    required this.menuRect,
+    required this.imageRect,
+    required this.onDismiss,
+    required this.child,
+  });
+
+  @override
+  State<_ImageMenuDismissListener> createState() =>
+      _ImageMenuDismissListenerState();
+}
+
+class _ImageMenuDismissListenerState extends State<_ImageMenuDismissListener> {
+  Offset? _downPosition;
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (event) => _downPosition = event.position,
+      onPointerUp: (event) {
+        final down = _downPosition;
+        _downPosition = null;
+        if (down == null) return;
+
+        final box = context.findRenderObject() as RenderBox?;
+        if (box == null || !box.attached) return;
+        // A drag (scroll) is not a tap: keep the menu.
+        if ((box.globalToLocal(event.position) - box.globalToLocal(down))
+                .distance >
+            kTouchSlop) {
+          return;
+        }
+        final pos = box.globalToLocal(event.position);
+        if (widget.menuRect.contains(pos)) return;
+        // A little slack around the image so wobbly taps on it don't deselect.
+        if (widget.imageRect.inflate(8).contains(pos)) return;
+        widget.onDismiss();
+      },
+      child: widget.child,
+    );
+  }
+}
+
+/// 玻璃菜单：查看大图 / 显示大小滑块 / 删除。材质取 GlassTokens.popover +
+/// blurSigma（blur 只给浮层），描边与分隔线用 edge，强调与危险色来自令牌。
+class _ImageSelectionMenu extends StatelessWidget {
+  final double sliderMin;
+  final double sliderMax;
+  final double sliderValue;
+  final VoidCallback onView;
+  final VoidCallback onDelete;
+  final VoidCallback onClose;
+  final ValueChanged<double> onSliderChanged;
+  final ValueChanged<double> onSliderCommit;
+
+  const _ImageSelectionMenu({
+    required this.sliderMin,
+    required this.sliderMax,
+    required this.sliderValue,
+    required this.onView,
+    required this.onDelete,
+    required this.onClose,
+    required this.onSliderChanged,
+    required this.onSliderCommit,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = Theme.of(context).extension<GlassTokens>();
+    final loc = context.loc;
+    final destructive =
+        tokens?.destructive ?? Theme.of(context).colorScheme.error;
+
+    return FocusScope(
+      // 浮层绝不抢焦点（jotsy 教训）：抢了键盘就收。
+      canRequestFocus: false,
+      child: Material(
+        // Overlay 条目不在 Scaffold 的 Material 之下（独立宿主时落在根
+        // Overlay），InkWell/Slider 需要 Material 祖先；透明类型不画东西，
+        // 玻璃质感由下面的 Container 负责。
+        type: MaterialType.transparency,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: BackdropFilter(
+            filter: ui.ImageFilter.blur(
+              sigmaX: tokens?.blurSigma ?? 13,
+              sigmaY: tokens?.blurSigma ?? 13,
+            ),
+            child: Container(
+              width: _imageMenuWidth,
+              decoration: BoxDecoration(
+                color: tokens?.popover ??
+                    Theme.of(context)
+                        .colorScheme
+                        .surface
+                        .withValues(alpha: 0.97),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: tokens?.edge ?? Colors.black12),
+                boxShadow: [
+                  BoxShadow(
+                    color: tokens?.shade ?? Colors.black26,
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    height: 40,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: InkWell(
+                            onTap: onView,
+                            child: Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 12),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.zoom_out_map, size: 20),
+                                  const SizedBox(width: 8),
+                                  Flexible(
+                                    child: Text(
+                                      loc.imageViewLarge,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: loc.imageMenuClose,
+                          icon: const Icon(Icons.close, size: 20),
+                          onPressed: onClose,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Divider(height: 1, color: tokens?.edge ?? Colors.black12),
+                  SizedBox(
+                    height: 44,
+                    child: Row(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(left: 12),
+                          child: Text(loc.imageMenuSize,
+                              style: Theme.of(context).textTheme.bodyMedium),
+                        ),
+                        Expanded(
+                          child: Slider(
+                            value: sliderValue.clamp(sliderMin, sliderMax),
+                            min: sliderMin,
+                            max: sliderMax,
+                            label:
+                                '${((sliderValue / sliderMax) * 100).round()}%',
+                            onChanged: onSliderChanged,
+                            onChangeEnd: onSliderCommit,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Divider(height: 1, color: tokens?.edge ?? Colors.black12),
+                  SizedBox(
+                    height: 40,
+                    child: InkWell(
+                      onTap: onDelete,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete_outline,
+                                size: 20, color: destructive),
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                loc.imageMenuDelete,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.copyWith(color: destructive),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -727,7 +1191,8 @@ Stylesheet _buildStylesheet(ThemeData theme) {
         (doc, docNode) => {
           Styles.padding: const CascadingPadding.only(top: 8),
           Styles.textStyle: TextStyle(
-            color: (base.color ?? theme.colorScheme.onSurface).withValues(alpha: 0.7),
+            color: (base.color ?? theme.colorScheme.onSurface)
+                .withValues(alpha: 0.7),
             fontStyle: FontStyle.italic,
             fontSize: base.fontSize,
             height: base.height,
@@ -750,34 +1215,34 @@ Stylesheet _buildStylesheet(ThemeData theme) {
 /// the super_editor component tree.
 class GjImageScope extends InheritedWidget {
   final String imageDir;
-  final void Function(String nodeId) onImageWidthChange;
+  final _ImageSelection selection;
 
   const GjImageScope({
     super.key,
     required this.imageDir,
-    required this.onImageWidthChange,
+    required this.selection,
     required super.child,
   });
 
   static GjImageScope of(BuildContext context) {
-    final scope =
-        context.dependOnInheritedWidgetOfExactType<GjImageScope>();
+    final scope = context.dependOnInheritedWidgetOfExactType<GjImageScope>();
     assert(scope != null, 'GjImageScope not found in context');
     return scope!;
   }
 
   @override
   bool updateShouldNotify(GjImageScope oldWidget) =>
-      imageDir != oldWidget.imageDir;
+      imageDir != oldWidget.imageDir || selection != oldWidget.selection;
 }
 
 /// Renders [ImageNode]s inline in the editor flow: local images from the
 /// note folder with the `|width` url suffix honored (as a *maximum* width:
 /// smaller images render at their natural size). Very tall images (>3:1)
-/// fold into a 2:3 box showing only their top, with a badge; tapping the
-/// folded image opens a full screen viewer. Unfolded, tapping toggles
-/// between full width and thumbnail width (the write-back happens through
-/// [GjImageScope.onImageWidthChange]).
+/// fold into a 2:3 box showing only their top, with a badge.
+///
+/// 苹果备忘录式交互：单击无操作（吞掉点击，选区不动），长按选中——描边 +
+/// 四角手柄 + 玻璃菜单（查看大图 / 显示大小 / 删除），见
+/// [SuperEditorBodyState] 的图片选中段。
 class GjImageComponentBuilder implements ComponentBuilder {
   const GjImageComponentBuilder();
 
@@ -796,8 +1261,7 @@ class GjImageComponentBuilder implements ComponentBuilder {
   }
 
   @override
-  Widget? createComponent(
-      SingleColumnDocumentComponentContext componentContext,
+  Widget? createComponent(SingleColumnDocumentComponentContext componentContext,
       SingleColumnLayoutComponentViewModel componentViewModel) {
     if (componentViewModel is! ImageComponentViewModel) return null;
 
@@ -833,6 +1297,7 @@ class _GjImageComponentState extends State<GjImageComponent> {
   String? _decodedPath;
   ImageStream? _imageStream;
   ImageStreamListener? _imageListener;
+  _ImageSelection? _watchedSelection;
 
   void _listenForImageSize(String imagePath, ImageProvider? provider) {
     if (_decodedPath == imagePath) return;
@@ -864,11 +1329,31 @@ class _GjImageComponentState extends State<GjImageComponent> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final selection = GjImageScope.of(context).selection;
+    if (!identical(selection, _watchedSelection)) {
+      _watchedSelection?.selectedNodeId
+          .removeListener(_onSelectionStateChanged);
+      _watchedSelection?.previewWidth.removeListener(_onSelectionStateChanged);
+      _watchedSelection = selection;
+      selection.selectedNodeId.addListener(_onSelectionStateChanged);
+      selection.previewWidth.addListener(_onSelectionStateChanged);
+    }
+  }
+
+  @override
   void dispose() {
+    _watchedSelection?.selectedNodeId.removeListener(_onSelectionStateChanged);
+    _watchedSelection?.previewWidth.removeListener(_onSelectionStateChanged);
     if (_imageListener != null) {
       _imageStream?.removeListener(_imageListener!);
     }
     super.dispose();
+  }
+
+  void _onSelectionStateChanged() {
+    if (mounted) setState(() {});
   }
 
   bool get _isLongImage {
@@ -894,6 +1379,8 @@ class _GjImageComponentState extends State<GjImageComponent> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scope = GjImageScope.of(context);
+    final selection = scope.selection;
 
     final match = imageUrlWidthSuffixRegex.firstMatch(widget.imageUrl);
     var imagePath = widget.imageUrl;
@@ -905,52 +1392,105 @@ class _GjImageComponentState extends State<GjImageComponent> {
 
     return LayoutBuilder(builder: (context, constraints) {
       final maxWidth = constraints.maxWidth;
+      final isSelected = selection.selectedNodeId.value == widget.nodeId;
+      // 滑块拖动的实时预览直接接管显示宽度；写回后的文档重载落到同一宽度，
+      // 视觉无缝。
+      final effectiveWidth =
+          (isSelected ? selection.previewWidth.value : null) ?? width;
       // `|width` is a maximum width: smaller images keep their natural size,
       // larger ones scale down to fit. No suffix: the full column width.
-      final displayMaxWidth =
-          (width != null ? math.min(width, maxWidth) : maxWidth)
-              .clamp(1.0, double.infinity);
+      final displayMaxWidth = (effectiveWidth != null
+              ? math.min(effectiveWidth, maxWidth)
+              : maxWidth)
+          .clamp(1.0, double.infinity);
 
       final provider = _resolveImageProvider(imagePath);
       _listenForImageSize(imagePath, provider);
       final isLongImage = _isLongImage;
 
-      // The inner tap recognizer sits deeper in the tree than the document
-      // gesture system's, so it wins the arena. (opaque: BoxComponent 链不参与
-      // 命中测试，deferToChild 会让整个点击丢失。)
-      return BoxComponent(
+      final content = isLongImage
+          ? _buildFoldedImage(provider!, displayMaxWidth, theme)
+          : _buildImage(provider, theme);
+
+      // The inner recognizers sit deeper in the tree than the document
+      // gesture system's, so they win the arena. (opaque: BoxComponent 链不
+      // 参与命中测试，deferToChild 会让整个点击丢失。)
+      return _ImageBoxComponent(
         key: widget.componentKey,
+        caretLineHeight: _caretLineHeight(theme),
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTap: isLongImage
-              ? () => _openFullScreen(context, provider)
-              : () {
-                  // 上限语义：自然宽 ≤ 缩略图宽的图片，|240 切换没有视觉
-                  // 变化——跳过并提示，避免"点了没反应"的死按钮感。
-                  final natural = _decodedImage;
-                  if (natural != null && natural.width <= 240) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(context.loc.imageToggleSkippedSmall),
-                        duration: const Duration(seconds: 2),
-                      ),
-                    );
-                    return;
-                  }
-                  GjImageScope.of(context).onImageWidthChange(widget.nodeId);
-                },
+          // 单击无操作：吞掉点击让文档手势系统收不到，选区保持原位（旧版
+          // 单击切 |240 会误触；开全屏交由长按菜单）。空 onTap 必须保留，
+          // 置 null 会把点击漏给 super_editor，光标就会落到图片块边界。
+          onTap: () {},
+          onLongPress: () {
+            final natural = _decodedImage;
+            final current = effectiveWidth ?? natural?.width.toDouble();
+            selection.requestSelect(
+              nodeId: widget.nodeId,
+              rectGetter: () {
+                final box = context.findRenderObject() as RenderBox?;
+                if (box == null || !box.attached) return null;
+                return box.localToGlobal(Offset.zero) & box.size;
+              },
+              columnWidth: maxWidth,
+              currentWidth:
+                  current != null ? math.min(current, maxWidth) : maxWidth,
+              provider: provider,
+            );
+          },
           child: Align(
             alignment: AlignmentDirectional.centerStart,
             child: ConstrainedBox(
               constraints: BoxConstraints(maxWidth: displayMaxWidth),
-              child: isLongImage
-                  ? _buildFoldedImage(provider!, displayMaxWidth, theme)
-                  : _buildImage(provider, theme),
+              child:
+                  isSelected ? _buildSelectionOverlay(content, theme) : content,
             ),
           ),
         ),
       );
     });
+  }
+
+  /// 选中视觉：账本黄描边 + 四角小圆点手柄（Apple Notes 式）。
+  Widget _buildSelectionOverlay(Widget content, ThemeData theme) {
+    final tokens = theme.extension<GlassTokens>();
+    final accent = tokens?.accent ?? theme.colorScheme.secondary;
+    const dotSize = 8.0;
+
+    Widget dot(Alignment alignment) => Align(
+          alignment: alignment,
+          child: Container(
+            width: dotSize,
+            height: dotSize,
+            decoration: BoxDecoration(
+              color: accent,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: theme.colorScheme.surface,
+                width: 1.5,
+              ),
+            ),
+          ),
+        );
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          foregroundDecoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(color: accent, width: 2),
+          ),
+          child: content,
+        ),
+        dot(Alignment.topLeft),
+        dot(Alignment.topRight),
+        dot(Alignment.bottomLeft),
+        dot(Alignment.bottomRight),
+      ],
+    );
   }
 
   Widget _buildImage(ImageProvider? provider, ThemeData theme) {
@@ -984,8 +1524,8 @@ class _GjImageComponentState extends State<GjImageComponent> {
   }
 
   /// A 2:3 box (width:height) showing only the top of the long image, with
-  /// a badge in the bottom right corner. Tapping opens the full screen
-  /// viewer. The `|width` toggle keeps acting on the display constraint.
+  /// a badge in the bottom right corner. Viewing the full image goes
+  /// through the long-press menu (查看大图).
   Widget _buildFoldedImage(
       ImageProvider provider, double displayMaxWidth, ThemeData theme) {
     return Stack(
@@ -1009,16 +1549,206 @@ class _GjImageComponentState extends State<GjImageComponent> {
       ],
     );
   }
+}
 
-  void _openFullScreen(BuildContext context, ImageProvider? provider) {
-    if (provider == null) return;
-    Navigator.push(
-      context,
-      MaterialPageRoute<void>(
-        builder: (context) => _FullScreenImageViewer(image: provider),
-      ),
+/// 正文的行高（标题 Medium 基样式，见 _buildStylesheet），用于图片块边界的
+/// 光标高度。
+double _caretLineHeight(ThemeData theme) {
+  final base = theme.textTheme.titleMedium;
+  return (base?.fontSize ?? 16) * (base?.height ?? 1.45);
+}
+
+/// BoxComponent equivalent for images whose caret edge hugs the leading
+/// edge at text line height. Stock [BoxComponent] reports a full-height
+/// edge (box_component.dart `getEdgeForPosition`), so a selection collapsed
+/// on the image boundary renders the caret as a thin bar as tall as the
+/// image - the cursor fix this fork ships.
+class _ImageBoxComponent extends StatefulWidget {
+  final double caretLineHeight;
+  final Widget child;
+
+  const _ImageBoxComponent({
+    super.key,
+    required this.caretLineHeight,
+    required this.child,
+  });
+
+  @override
+  State<_ImageBoxComponent> createState() => _ImageBoxComponentState();
+}
+
+class _ImageBoxComponentState extends State<_ImageBoxComponent>
+    with DocumentComponent {
+  @override
+  UpstreamDownstreamNodePosition getBeginningPosition() {
+    return const UpstreamDownstreamNodePosition.upstream();
+  }
+
+  @override
+  UpstreamDownstreamNodePosition getBeginningPositionNearX(double x) {
+    final width = (context.findRenderObject() as RenderBox).size.width;
+    return x < width / 2
+        ? const UpstreamDownstreamNodePosition.upstream()
+        : const UpstreamDownstreamNodePosition.downstream();
+  }
+
+  @override
+  UpstreamDownstreamNodePosition? movePositionLeft(NodePosition currentPosition,
+      [MovementModifier? movementModifier]) {
+    if (currentPosition == const UpstreamDownstreamNodePosition.upstream()) {
+      return null;
+    }
+    return const UpstreamDownstreamNodePosition.upstream();
+  }
+
+  @override
+  UpstreamDownstreamNodePosition? movePositionRight(
+      NodePosition currentPosition,
+      [MovementModifier? movementModifier]) {
+    if (currentPosition == const UpstreamDownstreamNodePosition.downstream()) {
+      return null;
+    }
+    return const UpstreamDownstreamNodePosition.downstream();
+  }
+
+  @override
+  UpstreamDownstreamNodePosition? movePositionUp(
+          NodePosition currentPosition) =>
+      null;
+
+  @override
+  UpstreamDownstreamNodePosition? movePositionDown(
+          NodePosition currentPosition) =>
+      null;
+
+  @override
+  UpstreamDownstreamNodePosition getEndPosition() {
+    return const UpstreamDownstreamNodePosition.downstream();
+  }
+
+  @override
+  UpstreamDownstreamNodePosition getEndPositionNearX(double x) {
+    final width = (context.findRenderObject() as RenderBox).size.width;
+    return x < width / 2
+        ? const UpstreamDownstreamNodePosition.upstream()
+        : const UpstreamDownstreamNodePosition.downstream();
+  }
+
+  @override
+  Offset getOffsetForPosition(NodePosition nodePosition) {
+    if (nodePosition is! UpstreamDownstreamNodePosition) {
+      throw Exception(
+          'Expected nodePosition of type UpstreamDownstreamNodePosition but received: $nodePosition');
+    }
+
+    final myBox = context.findRenderObject() as RenderBox;
+    return nodePosition.affinity == TextAffinity.upstream
+        ? Offset(myBox.size.width / 4, myBox.size.height / 2)
+        : Offset(3 * myBox.size.width / 4, myBox.size.height / 2);
+  }
+
+  @override
+  UpstreamDownstreamNodePosition getPositionAtOffset(Offset localOffset) {
+    final myBox = context.findRenderObject() as RenderBox;
+    return localOffset.dx <= myBox.size.width / 2
+        ? const UpstreamDownstreamNodePosition.upstream()
+        : const UpstreamDownstreamNodePosition.downstream();
+  }
+
+  @override
+  Rect getRectForPosition(NodePosition nodePosition) {
+    if (nodePosition is! UpstreamDownstreamNodePosition) {
+      throw Exception(
+          'Expected nodePosition of type UpstreamDownstreamNodePosition but received: $nodePosition');
+    }
+
+    final myBox = context.findRenderObject() as RenderBox;
+    return Rect.fromLTWH(0, 0, myBox.size.width, myBox.size.height);
+  }
+
+  @override
+  Rect getEdgeForPosition(NodePosition nodePosition) {
+    final boundingBox = getRectForPosition(nodePosition);
+    // 光标修正：按正文行高绘制、锚在图片前缘（Stock BoxComponent 返回整图
+    // 高的 edge，选区落在图片边界时光标被画成等高细竖条）。
+    final height = math.min(widget.caretLineHeight, boundingBox.height);
+    return Rect.fromLTWH(
+      boundingBox.left,
+      boundingBox.bottom - height,
+      boundingBox.width,
+      height,
     );
   }
+
+  @override
+  Rect getRectForSelection(
+      NodePosition basePosition, NodePosition extentPosition) {
+    if (basePosition is! UpstreamDownstreamNodePosition) {
+      throw Exception(
+          'Expected nodePosition of type UpstreamDownstreamNodePosition but received: $basePosition');
+    }
+    if (extentPosition is! UpstreamDownstreamNodePosition) {
+      throw Exception(
+          'Expected nodePosition of type UpstreamDownstreamNodePosition but received: $extentPosition');
+    }
+
+    final selection = UpstreamDownstreamNodeSelection(
+        base: basePosition, extent: extentPosition);
+    if (selection.isCollapsed) {
+      return getRectForPosition(selection.extent);
+    }
+
+    final myBox = context.findRenderObject() as RenderBox;
+    return Offset.zero & myBox.size;
+  }
+
+  @override
+  UpstreamDownstreamNodeSelection getCollapsedSelectionAt(nodePosition) {
+    if (nodePosition is! UpstreamDownstreamNodePosition) {
+      throw Exception(
+          'The given nodePosition ($nodePosition) is not compatible with _ImageBoxComponent');
+    }
+    return UpstreamDownstreamNodeSelection.collapsed(nodePosition);
+  }
+
+  @override
+  UpstreamDownstreamNodeSelection getSelectionBetween(
+      {required basePosition, required extentPosition}) {
+    if (basePosition is! UpstreamDownstreamNodePosition) {
+      throw Exception(
+          'The given basePosition ($basePosition) is not compatible with _ImageBoxComponent');
+    }
+    if (extentPosition is! UpstreamDownstreamNodePosition) {
+      throw Exception(
+          'The given extentPosition ($extentPosition) is not compatible with _ImageBoxComponent');
+    }
+
+    return UpstreamDownstreamNodeSelection(
+        base: basePosition, extent: extentPosition);
+  }
+
+  @override
+  UpstreamDownstreamNodeSelection getSelectionInRange(
+      Offset localBaseOffset, Offset localExtentOffset) {
+    return getSelectionBetween(
+      basePosition: getPositionAtOffset(localBaseOffset),
+      extentPosition: getPositionAtOffset(localExtentOffset),
+    );
+  }
+
+  @override
+  UpstreamDownstreamNodeSelection getSelectionOfEverything() {
+    return const UpstreamDownstreamNodeSelection.all();
+  }
+
+  @override
+  bool isVisualSelectionSupported() => true;
+
+  @override
+  MouseCursor? getDesiredCursorAtOffset(Offset localOffset) => null;
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 class _LongImageBadge extends StatelessWidget {

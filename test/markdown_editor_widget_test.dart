@@ -187,7 +187,7 @@ void main() {
     expect(controller.text.contains('![Image](./c.jpg)'), isTrue);
   });
 
-  testWidgets('Tapping an image toggles the |240 thumbnail suffix',
+  testWidgets('Tapping an image does nothing to the body or the selection',
       (tester) async {
     var note = buildNote("Hello\n\n![x](./a.jpg)\n\nBye", title: "Img");
 
@@ -200,14 +200,98 @@ void main() {
 
     await tester.tap(find.byType(GjImageComponent));
     await tester.pump(const Duration(milliseconds: 400));
-    expect(editorState.getNote().body, "Hello\n\n![x](./a.jpg|240)\n\nBye");
 
-    // The document reloaded with the suffix, so the component is new: tap
-    // again to go back to full width.
-    expect(find.byType(GjImageComponent), findsOneWidget);
-    await tester.tap(find.byType(GjImageComponent));
-    await tester.pump(const Duration(milliseconds: 400));
+    // 单击无操作：正文与选中菜单都不动。
     expect(editorState.getNote().body, "Hello\n\n![x](./a.jpg)\n\nBye");
+    expect(find.byIcon(Icons.zoom_out_map), findsNothing);
+  });
+
+  testWidgets('Long-pressing an image opens the glass menu; the size slider '
+      'writes the |N suffix back', (tester) async {
+    var note = buildNote("Hello\n\n![x](./a.jpg|240)\n\nBye", title: "Img");
+
+    var errors = await pumpEditor(tester, note);
+    expect(errors, isEmpty);
+    expect(find.byType(GjImageComponent), findsOneWidget);
+
+    final editorState =
+        tester.state<MarkdownEditorState>(find.byType(MarkdownEditor));
+
+    // 长按选中：玻璃菜单浮出。
+    await tester.longPress(find.byType(GjImageComponent));
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.zoom_out_map), findsOneWidget);
+    expect(find.byIcon(Icons.delete_outline), findsOneWidget);
+
+    // 滑块拖到最左（列宽 25%）：onChangeEnd 精确写回该处 markup。
+    final slider = tester.widget<Slider>(find.byType(Slider));
+    await tester.drag(find.byType(Slider), const Offset(-400, 0));
+    await tester.pumpAndSettle();
+    expect(
+      editorState.getNote().body,
+      "Hello\n\n![x](./a.jpg|${slider.min.round()})\n\nBye",
+    );
+
+    // 拖到最右（列宽 100%）：等价无上限，移除 |N 后缀。
+    await tester.drag(find.byType(Slider), const Offset(400, 0));
+    await tester.pumpAndSettle();
+    expect(editorState.getNote().body, "Hello\n\n![x](./a.jpg)\n\nBye");
+
+    // 点菜单/图片以外区域：退出选中，菜单收起。
+    await tester.tapAt(const Offset(10, 400));
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.zoom_out_map), findsNothing);
+    expect(editorState.getNote().body, "Hello\n\n![x](./a.jpg)\n\nBye");
+  });
+
+  testWidgets('Long-pressing the menu delete removes the image markup',
+      (tester) async {
+    var note = buildNote("Hello\n\n![x](./a.jpg)\n\nBye", title: "Img");
+
+    var errors = await pumpEditor(tester, note);
+    expect(errors, isEmpty);
+
+    final editorState =
+        tester.state<MarkdownEditorState>(find.byType(MarkdownEditor));
+
+    await tester.longPress(find.byType(GjImageComponent));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.delete_outline));
+    await tester.pumpAndSettle();
+
+    // 只删文档引用与 markup；markup 从正文精确消失。
+    expect(editorState.getNote().body, "Hello\n\nBye");
+    expect(find.byType(GjImageComponent), findsNothing);
+  });
+
+  testWidgets('Caret edge on an image boundary is text line-height tall',
+      (tester) async {
+    var note = buildNote("Hello\n\n![x](./a.jpg)\n\nBye", title: "Img");
+
+    var errors = await pumpEditor(tester, note);
+    expect(errors, isEmpty);
+
+    final editor = tester.widget<SuperEditor>(find.byType(SuperEditor));
+    final layout = editor.documentLayoutKey!.currentState! as DocumentLayout;
+    final imageId =
+        editor.editor.document.toList().whereType<ImageNode>().first.id;
+
+    // 光标修正：选区落在图片块边界时，光标矩形按正文行高绘制、锚在图片
+    // 前缘（Stock BoxComponent 返回整图高的 edge，渲染成等高细竖条）。
+    final upstreamEdge = layout.getEdgeForPosition(DocumentPosition(
+      nodeId: imageId,
+      nodePosition: const UpstreamDownstreamNodePosition.upstream(),
+    ));
+    expect(upstreamEdge, isNotNull);
+    expect(upstreamEdge!.height, closeTo(16 * 1.45, 0.5));
+
+    final downstreamEdge = layout.getEdgeForPosition(DocumentPosition(
+      nodeId: imageId,
+      nodePosition: const UpstreamDownstreamNodePosition.downstream(),
+    ));
+    expect(downstreamEdge, isNotNull);
+    expect(downstreamEdge!.height, closeTo(16 * 1.45, 0.5));
   });
 
   testWidgets('Focus change after an external reload keeps the old composer '
