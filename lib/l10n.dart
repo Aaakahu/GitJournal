@@ -130,6 +130,12 @@ extension LocalizedBuildContext on BuildContext {
         return loc.settingsSshKeyEd25519;
       case Lk.settingsSshKeyRsa:
         return loc.settingsSshKeyRsa;
+      case Lk.settingsImagesDefaultAlignLeft:
+        return loc.settingsImagesDefaultAlignLeft;
+      case Lk.settingsImagesDefaultAlignCenter:
+        return loc.settingsImagesDefaultAlignCenter;
+      case Lk.settingsImagesDefaultAlignRight:
+        return loc.settingsImagesDefaultAlignRight;
     }
   }
 }
@@ -221,4 +227,7 @@ enum Lk {
   settingsNoteMetaDataTitleMetaDataFilename,
   settingsSshKeyEd25519,
   settingsSshKeyRsa,
+  settingsImagesDefaultAlignLeft,
+  settingsImagesDefaultAlignCenter,
+  settingsImagesDefaultAlignRight,
 }

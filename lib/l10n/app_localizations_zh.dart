@@ -1437,6 +1437,21 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get imageMenuClose => '关闭';
+
+  @override
+  String get settingsImagesDefaultAlign => '图片默认对齐';
+
+  @override
+  String get settingsImagesDefaultAlignLeft => '左对齐';
+
+  @override
+  String get settingsImagesDefaultAlignCenter => '居中';
+
+  @override
+  String get settingsImagesDefaultAlignRight => '右对齐';
+
+  @override
+  String get imageMenuAlign => '对齐';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -2872,6 +2887,21 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get imageMenuClose => '关闭';
+
+  @override
+  String get settingsImagesDefaultAlign => '图片默认对齐';
+
+  @override
+  String get settingsImagesDefaultAlignLeft => '左对齐';
+
+  @override
+  String get settingsImagesDefaultAlignCenter => '居中';
+
+  @override
+  String get settingsImagesDefaultAlignRight => '右对齐';
+
+  @override
+  String get imageMenuAlign => '对齐';
 }
 
 /// The translations for Chinese, as used in Taiwan (`zh_TW`).

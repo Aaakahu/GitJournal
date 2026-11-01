@@ -5,6 +5,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gitjournal/markdown/gj_markdown_serializers.dart';
 import 'package:gitjournal/markdown/rich_editor_safety.dart';
+import 'package:gitjournal/utils/markdown.dart';
 import 'package:super_editor/super_editor.dart';
 
 void main() {
@@ -20,6 +21,9 @@ void main() {
       // Image with our |width url suffix, both with and without
       '![Image](./a.jpg|600)',
       '![Image](./sub/dir/b.png)',
+      // Image with the alignment letter suffix (center / right)
+      '![Image](./a.jpg|600c)',
+      '![Image](./a.jpg|600r)',
       // Bold / italic / strikethrough / inline code / links
       '**bold** and *italic*',
       '~~struck~~ text',
@@ -65,6 +69,14 @@ void main() {
       final doc = deserializeGitJournalMarkdown('![Image](./a.jpg|600)');
       final out = serializeGitJournalDocument(doc);
       expect(out, contains('./a.jpg|600'));
+    });
+
+    test('image url |600c alignment suffix is preserved verbatim', () {
+      final doc = deserializeGitJournalMarkdown('![Image](./a.jpg|600c)');
+      final out = serializeGitJournalDocument(doc);
+      expect(out, contains('./a.jpg|600c'));
+      expect(RichEditorSafety.isRoundtripStable('![Image](./a.jpg|600c)'),
+          isTrue);
     });
 
     test('task list checked state is preserved', () {
@@ -127,6 +139,60 @@ void main() {
       final doc2 = deserializeGitJournalMarkdown(out);
       final out2 = serializeGitJournalDocument(doc2);
       expect(out2, equals(out));
+    });
+  });
+
+  group('image align suffix (|Nc / |Nr / |c)', () {
+    test('|600 without a letter parses unchanged (existing |N data)', () {
+      final m = imageMarkupRegex.firstMatch('![x](./a.jpg|600)')!;
+      expect(m.group(2), './a.jpg');
+      expect(m.group(3), '600');
+      expect(alignFromMarkupMatch(m), isNull);
+    });
+
+    test('|600c / |600r / |c parse width + alignment letter', () {
+      final mc = imageMarkupRegex.firstMatch('![x](./a.jpg|600c)')!;
+      expect(mc.group(2), './a.jpg');
+      expect(mc.group(3), '600');
+      expect(alignFromMarkupMatch(mc), GjImageAlign.center);
+
+      final mr = imageMarkupRegex.firstMatch('![x](./a.jpg|600r)')!;
+      expect(mr.group(3), '600');
+      expect(alignFromMarkupMatch(mr), GjImageAlign.right);
+
+      final mo = imageMarkupRegex.firstMatch('![x](./a.jpg|c)')!;
+      expect(mo.group(3), isNull);
+      expect(alignFromMarkupMatch(mo), GjImageAlign.center);
+    });
+
+    test('rendered url suffix splits path/width/letter (%7C form)', () {
+      final m = imageUrlWidthSuffixRegex.firstMatch('./a.jpg%7C600c')!;
+      expect(m.group(1), './a.jpg');
+      expect(m.group(2), '600');
+      expect(imageUrlAlign('./a.jpg%7C600c'), GjImageAlign.center);
+      expect(imageUrlAlign('./a.jpg%7C600'), isNull);
+      expect(imageUrlAlign('./a.jpg%7Cr'), GjImageAlign.right);
+    });
+
+    test('gjImageMarkup rebuilds the suffix exactly', () {
+      expect(gjImageMarkup('x', './a.jpg', 240, GjImageAlign.left),
+          '![x](./a.jpg|240)');
+      expect(gjImageMarkup('x', './a.jpg', 600, GjImageAlign.center),
+          '![x](./a.jpg|600c)');
+      expect(gjImageMarkup('x', './a.jpg', null, GjImageAlign.right),
+          '![x](./a.jpg|r)');
+      expect(gjImageMarkup('x', './a.jpg', null, GjImageAlign.left),
+          '![x](./a.jpg)');
+    });
+
+    test('letter-only |c roundtrips byte-stable', () {
+      final doc = deserializeGitJournalMarkdown('![Image](./a.jpg|c)');
+      final out = serializeGitJournalDocument(doc);
+      expect(
+        RichEditorSafety.normalizeForCompare(out),
+        equals(RichEditorSafety.normalizeForCompare('![Image](./a.jpg|c)')),
+        reason: 'roundtrip changed the body',
+      );
     });
   });
 

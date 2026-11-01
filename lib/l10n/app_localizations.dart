@@ -2846,6 +2846,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Close'**
   String get imageMenuClose;
+
+  /// No description provided for @settingsImagesDefaultAlign.
+  ///
+  /// In en, this message translates to:
+  /// **'Default image alignment'**
+  String get settingsImagesDefaultAlign;
+
+  /// No description provided for @settingsImagesDefaultAlignLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Left'**
+  String get settingsImagesDefaultAlignLeft;
+
+  /// No description provided for @settingsImagesDefaultAlignCenter.
+  ///
+  /// In en, this message translates to:
+  /// **'Center'**
+  String get settingsImagesDefaultAlignCenter;
+
+  /// No description provided for @settingsImagesDefaultAlignRight.
+  ///
+  /// In en, this message translates to:
+  /// **'Right'**
+  String get settingsImagesDefaultAlignRight;
+
+  /// No description provided for @imageMenuAlign.
+  ///
+  /// In en, this message translates to:
+  /// **'Alignment'**
+  String get imageMenuAlign;
 }
 
 class _AppLocalizationsDelegate

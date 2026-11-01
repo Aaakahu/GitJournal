@@ -396,6 +396,16 @@ class MarkdownEditorState extends State<MarkdownEditor>
     _onImageWidthSet(match.start, match.end, widthOrNull);
   }
 
+  /// Sets the alignment letter of the imageIndex-th image markup in the body
+  /// (same document-order mapping as [_onRichImageWidthSet]).
+  void _onRichImageAlignSet(int imageIndex, GjImageAlign align) {
+    _richBodyEditorKey.currentState?.flushPendingWrite();
+    var matches = imageMarkupRegex.allMatches(_textController.text).toList();
+    if (imageIndex >= matches.length) return;
+    var match = matches[imageIndex];
+    _onImageAlignSet(match.start, match.end, align);
+  }
+
   void _noteTextChanged() {
     try {
       _applyHeuristics();
@@ -559,7 +569,8 @@ class MarkdownEditorState extends State<MarkdownEditor>
 
   // Rewrites exactly the image markup between [start] and [end]: a markup
   // with a `|width` suffix loses it (full width), a plain one gains `|240`
-  // (thumbnail). Not tracked by the undo stack - toggling an image size
+  // (thumbnail). An existing alignment letter is kept (a bare `|c` when the
+  // width goes away). Not tracked by the undo stack - toggling an image size
   // isn't undoable.
   void _onImageMarkupToggled(int start, int end) {
     var text = _textController.text;
@@ -568,9 +579,11 @@ class MarkdownEditorState extends State<MarkdownEditor>
     var markup = text.substring(start, end);
     var match = imageMarkupRegex.firstMatch(markup);
     if (match == null) return;
+    var align = alignFromMarkupMatch(match) ?? GjImageAlign.left;
     var newMarkup = match.group(3) != null
-        ? '![${match.group(1)}](${match.group(2)})'
-        : '![${match.group(1)}](${match.group(2)}|$gjImageThumbnailWidth)';
+        ? gjImageMarkup(match.group(1)!, match.group(2)!, null, align)
+        : gjImageMarkup(
+            match.group(1)!, match.group(2)!, gjImageThumbnailWidth, align);
 
     int adjustOffset(int offset) {
       if (offset <= start) return offset;
@@ -593,8 +606,9 @@ class MarkdownEditorState extends State<MarkdownEditor>
 
   /// Rewrites exactly the image markup between [start] and [end]: sets the
   /// `|N` width suffix to [widthOrNull] (appended when the markup has none),
-  /// or removes the suffix on null (full column width). Not tracked by the
-  /// undo stack - resizing an image isn't undoable.
+  /// or removes the suffix on null (full column width, keeping a bare `|c`/
+  /// `|r` alignment letter). Not tracked by the undo stack - resizing an
+  /// image isn't undoable.
   void _onImageWidthSet(int start, int end, double? widthOrNull) {
     var text = _textController.text;
     if (start < 0 || end > text.length || start >= end) return;
@@ -602,9 +616,50 @@ class MarkdownEditorState extends State<MarkdownEditor>
     var markup = text.substring(start, end);
     var match = imageMarkupRegex.firstMatch(markup);
     if (match == null) return;
-    var newMarkup = widthOrNull == null
-        ? '![${match.group(1)}](${match.group(2)})'
-        : '![${match.group(1)}](${match.group(2)}|${widthOrNull.round()})';
+    var newMarkup = gjImageMarkup(
+      match.group(1)!,
+      match.group(2)!,
+      widthOrNull?.round(),
+      alignFromMarkupMatch(match) ?? GjImageAlign.left,
+    );
+
+    int adjustOffset(int offset) {
+      if (offset <= start) return offset;
+      if (offset >= end) return offset + newMarkup.length - markup.length;
+      return start;
+    }
+
+    var selection = _textController.selection;
+    setState(() {
+      _textController.value = TextEditingValue(
+        text: text.replaceRange(start, end, newMarkup),
+        selection: TextSelection(
+          baseOffset: adjustOffset(selection.baseOffset),
+          extentOffset: adjustOffset(selection.extentOffset),
+        ),
+      );
+      _noteModified = true;
+    });
+  }
+
+  /// Rewrites exactly the image markup between [start] and [end]: pins the
+  /// alignment letter (`c`/`r`; left strips it) while keeping the current
+  /// `|N` width. Not tracked by the undo stack - aligning an image isn't
+  /// undoable.
+  void _onImageAlignSet(int start, int end, GjImageAlign align) {
+    var text = _textController.text;
+    if (start < 0 || end > text.length || start >= end) return;
+
+    var markup = text.substring(start, end);
+    var match = imageMarkupRegex.firstMatch(markup);
+    if (match == null) return;
+    var width = match.group(3);
+    var newMarkup = gjImageMarkup(
+      match.group(1)!,
+      match.group(2)!,
+      width == null ? null : int.parse(width),
+      align,
+    );
 
     int adjustOffset(int offset) {
       if (offset <= start) return offset;

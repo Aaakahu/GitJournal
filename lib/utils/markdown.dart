@@ -7,21 +7,76 @@
 import 'dart:convert';
 import 'dart:core';
 
-/// Matches image markups with local paths: `![alt](path)` or
-/// `![alt](path|width)` where `|width` is our display-width extension
-/// (in logical pixels).
+import 'package:flutter/painting.dart' show AlignmentDirectional;
+
+/// Matches image markups with local paths: `![alt](path)`,
+/// `![alt](path|width)` or `![alt](path|width[c|r])` where `|width` is our
+/// display-width extension (in logical pixels) and an optional trailing
+/// `c`/`r` letter pins the image to center/right alignment (no letter =
+/// default alignment). A bare `|c`/`|r` without a width is valid too.
 final RegExp imageMarkupRegex =
-    RegExp(r'!\[([^\]]*)\]\(([^()\s|]+)(?:\|(\d+))?\)');
+    RegExp(r'!\[([^\]]*)\]\(([^()\s|]+)(?:\|(?=[0-9cr])(\d+)?([cr])?)?\)');
 
 /// The width in logical pixels a plain image markup gets when it is toggled
 /// to thumbnail size (`|240` suffix). Matches what desktop Obsidian shows
 /// for `![[name|240]]` after inbox-sync.
 const int gjImageThumbnailWidth = 240;
 
-/// Splits the rendered image URL into its path and the `|width` suffix.
+/// Splits the rendered image URL into its path and the `|width[c|r]` suffix.
 /// The `|` survives the markdown parser percent-encoded as `%7C`.
 final RegExp imageUrlWidthSuffixRegex =
-    RegExp(r'^(.*?)(?:%7C|\|)(\d+)$', caseSensitive: false);
+    RegExp(r'^(.*?)(?:%7C|\|)(?=[0-9cr])(\d+)?([cr])?$', caseSensitive: false);
+
+/// The horizontal alignment of a single image. Driven by the optional
+/// `c`/`r` letter of the `|N` width suffix; no letter falls back to the
+/// global default (see Settings.imageDefaultAlign).
+enum GjImageAlign { left, center, right }
+
+/// The [GjImageAlign] encoded by a markup regex letter group
+/// ([imageMarkupRegex] group 4), or null when the markup has no letter.
+GjImageAlign? alignFromMarkupMatch(RegExpMatch match) {
+  final letter = match.group(4);
+  if (letter == 'c') return GjImageAlign.center;
+  if (letter == 'r') return GjImageAlign.right;
+  return null;
+}
+
+/// The [GjImageAlign] encoded in a rendered image URL's suffix letter, or
+/// null when the URL carries no alignment letter.
+GjImageAlign? imageUrlAlign(String url) {
+  final match = imageUrlWidthSuffixRegex.firstMatch(url);
+  if (match == null) return null;
+  final letter = match.group(3);
+  if (letter == null) return null;
+  return letter.toLowerCase() == 'c'
+      ? GjImageAlign.center
+      : GjImageAlign.right;
+}
+
+/// Rebuilds an image markup `![alt](path|W[c|r])` with the given display
+/// width and alignment. Left alignment is the default and emits no letter;
+/// center/right emit the letter (width may be absent: `|c`).
+String gjImageMarkup(String alt, String path, int? width, GjImageAlign align) {
+  final letter = align == GjImageAlign.center
+      ? 'c'
+      : align == GjImageAlign.right
+          ? 'r'
+          : '';
+  if (width == null && letter.isEmpty) {
+    return '![$alt]($path)';
+  }
+  return '![$alt]($path|${width ?? ''}$letter)';
+}
+
+extension GjImageAlignDirectional on GjImageAlign {
+  /// The box alignment this image alignment maps to inside the rendered
+  /// column.
+  AlignmentDirectional toAlignmentDirectional() => switch (this) {
+        GjImageAlign.left => AlignmentDirectional.centerStart,
+        GjImageAlign.center => AlignmentDirectional.center,
+        GjImageAlign.right => AlignmentDirectional.centerEnd,
+      };
+}
 
 /// The path of the first local image markup in the markdown [body],
 /// or null if there is none.

@@ -451,5 +451,10 @@
   "imageViewLarge": "查看大图",
   "imageMenuSize": "显示大小",
   "imageMenuDelete": "删除",
-  "imageMenuClose": "关闭"
+  "imageMenuClose": "关闭",
+  "settingsImagesDefaultAlign": "图片默认对齐",
+  "settingsImagesDefaultAlignLeft": "左对齐",
+  "settingsImagesDefaultAlignCenter": "居中",
+  "settingsImagesDefaultAlignRight": "右对齐",
+  "imageMenuAlign": "对齐"
 }

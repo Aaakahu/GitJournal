@@ -27,6 +27,10 @@ class MarkdownImage extends StatefulWidget {
   final String altText;
   final String tooltip;
 
+  /// Horizontal alignment of the image inside the column (from the markup's
+  /// `c`/`r` suffix letter, or the global default).
+  final AlignmentDirectional alignment;
+
   // FIXME: Avoid using dynamic!
   final Future<dynamic> data;
 
@@ -35,7 +39,8 @@ class MarkdownImage extends StatefulWidget {
   final VoidCallback? onToggleWidth;
 
   const MarkdownImage._(this.data, this.width, this.height, String? altText,
-      String? tooltip, {this.onToggleWidth})
+      String? tooltip,
+      {this.onToggleWidth, this.alignment = AlignmentDirectional.centerStart})
       : altText = altText ?? "",
         tooltip = tooltip ?? "";
 
@@ -44,6 +49,7 @@ class MarkdownImage extends StatefulWidget {
       double? height,
       String? altText,
       String? titel,
+      AlignmentDirectional alignment = AlignmentDirectional.centerStart,
       void Function()? onToggleWidth}) {
     final file = ((uri.isScheme("http") || uri.isScheme("https"))
         ? DefaultCacheManager().getSingleFile(uri.toString())
@@ -54,7 +60,7 @@ class MarkdownImage extends StatefulWidget {
         (value) => value.path.endsWith(".svg") ? value.readAsString() : file);
 
     return MarkdownImage._(data, width, height, altText, titel,
-        onToggleWidth: onToggleWidth);
+        onToggleWidth: onToggleWidth, alignment: alignment);
   }
 
   @override
@@ -224,7 +230,7 @@ class _MarkdownImageState extends State<MarkdownImage> {
                         : Colors.black,
                   );
                   im = Align(
-                    alignment: AlignmentDirectional.centerStart,
+                    alignment: widget.alignment,
                     child: themable,
                   );
                 } else {
@@ -245,13 +251,13 @@ class _MarkdownImageState extends State<MarkdownImage> {
                     im = _buildFoldedImage(file, displayMaxWidth, theme);
                   } else {
                     im = Align(
-                      alignment: AlignmentDirectional.centerStart,
+                      alignment: widget.alignment,
                       child: ConstrainedBox(
                         constraints:
                             BoxConstraints(maxWidth: displayMaxWidth),
                         child: FittedBox(
                           fit: BoxFit.scaleDown,
-                          alignment: AlignmentDirectional.centerStart,
+                          alignment: widget.alignment,
                           child: themable,
                         ),
                       ),

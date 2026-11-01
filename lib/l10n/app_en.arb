@@ -544,5 +544,10 @@
   "imageViewLarge": "View full image",
   "imageMenuSize": "Image size",
   "imageMenuDelete": "Delete",
-  "imageMenuClose": "Close"
+  "imageMenuClose": "Close",
+  "settingsImagesDefaultAlign": "Default image alignment",
+  "settingsImagesDefaultAlignLeft": "Left",
+  "settingsImagesDefaultAlignCenter": "Center",
+  "settingsImagesDefaultAlignRight": "Right",
+  "imageMenuAlign": "Alignment"
 }

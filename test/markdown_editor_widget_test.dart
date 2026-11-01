@@ -265,6 +265,59 @@ void main() {
     expect(find.byType(GjImageComponent), findsNothing);
   });
 
+  testWidgets('Image menu align buttons rewrite the alignment suffix '
+      '(width kept, letter-only on a plain markup)', (tester) async {
+    var note = buildNote("Hello\n\n![x](./a.jpg|240)\n\nBye", title: "Img");
+
+    var errors = await pumpEditor(tester, note);
+    expect(errors, isEmpty);
+
+    final editorState =
+        tester.state<MarkdownEditorState>(find.byType(MarkdownEditor));
+
+    await tester.longPress(find.byType(GjImageComponent));
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.format_align_center), findsOneWidget);
+
+    // 居中：|240 -> |240c，宽度保留，只动对齐字母。
+    await tester.tap(find.byIcon(Icons.format_align_center));
+    await tester.pumpAndSettle();
+    expect(editorState.getNote().body, "Hello\n\n![x](./a.jpg|240c)\n\nBye");
+
+    // 右对齐：|240c -> |240r。
+    await tester.tap(find.byIcon(Icons.format_align_right));
+    await tester.pumpAndSettle();
+    expect(editorState.getNote().body, "Hello\n\n![x](./a.jpg|240r)\n\nBye");
+
+    // 左对齐 = 无字母：|240r -> |240。
+    await tester.tap(find.byIcon(Icons.format_align_left));
+    await tester.pumpAndSettle();
+    expect(editorState.getNote().body, "Hello\n\n![x](./a.jpg|240)\n\nBye");
+
+    // 菜单外点击退出选中（欠着的文档重载落地），markup 稳定。
+    await tester.tapAt(const Offset(10, 400));
+    await tester.pumpAndSettle();
+    expect(editorState.getNote().body, "Hello\n\n![x](./a.jpg|240)\n\nBye");
+  });
+
+  testWidgets('Aligning a plain markup writes the letter-only suffix',
+      (tester) async {
+    var note = buildNote("Hello\n\n![x](./a.jpg)\n\nBye", title: "Img");
+
+    var errors = await pumpEditor(tester, note);
+    expect(errors, isEmpty);
+
+    final editorState =
+        tester.state<MarkdownEditorState>(find.byType(MarkdownEditor));
+
+    await tester.longPress(find.byType(GjImageComponent));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.format_align_center));
+    await tester.pumpAndSettle();
+    expect(editorState.getNote().body, "Hello\n\n![x](./a.jpg|c)\n\nBye");
+  });
+
   testWidgets('Caret edge on an image boundary is text line-height tall',
       (tester) async {
     var note = buildNote("Hello\n\n![x](./a.jpg)\n\nBye", title: "Img");

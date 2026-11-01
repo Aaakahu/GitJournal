@@ -1505,4 +1505,19 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get imageMenuClose => 'Close';
+
+  @override
+  String get settingsImagesDefaultAlign => 'Default image alignment';
+
+  @override
+  String get settingsImagesDefaultAlignLeft => 'Left';
+
+  @override
+  String get settingsImagesDefaultAlignCenter => 'Center';
+
+  @override
+  String get settingsImagesDefaultAlignRight => 'Right';
+
+  @override
+  String get imageMenuAlign => 'Alignment';
 }

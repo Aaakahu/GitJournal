@@ -47,6 +47,14 @@ class SuperEditorBody extends StatefulWidget {
   /// column width").
   final void Function(int imageIndex, double? widthOrNull)? onImageWidthSet;
 
+  /// Called with the document-order index of the selected image node and the
+  /// new alignment, so the parent can precisely rewrite that markup's `c`/`r`
+  /// suffix letter (left strips it).
+  final void Function(int imageIndex, GjImageAlign align)? onImageAlignSet;
+
+  /// Alignment used for images whose markup carries no `c`/`r` letter.
+  final GjImageAlign defaultImageAlign;
+
   const SuperEditorBody({
     super.key,
     required this.textController,
@@ -54,6 +62,8 @@ class SuperEditorBody extends StatefulWidget {
     required this.autofocus,
     required this.onChanged,
     this.onImageWidthSet,
+    this.onImageAlignSet,
+    this.defaultImageAlign = GjImageAlign.left,
   });
 
   @override
@@ -344,6 +354,7 @@ class SuperEditorBodyState extends State<SuperEditorBody>
     return GjImageScope(
       imageDir: widget.imageDir,
       selection: _imageSelection,
+      defaultImageAlign: widget.defaultImageAlign,
       child: SuperEditor(
         editor: _editor,
         focusNode: _editorFocusNode,
@@ -426,6 +437,21 @@ class SuperEditorBodyState extends State<SuperEditorBody>
       if (node is! ImageNode) continue;
       if (node.id == nodeId) {
         widget.onImageWidthSet?.call(imageIndex, widthOrNull);
+        return;
+      }
+      imageIndex++;
+    }
+  }
+
+  /// Same document-order mapping as [_onImageWidthSet], for the alignment
+  /// buttons of the image menu.
+  void _onImageAlignSet(String nodeId, GjImageAlign align) {
+    final nodes = _document.toList(growable: false);
+    var imageIndex = 0;
+    for (final node in nodes) {
+      if (node is! ImageNode) continue;
+      if (node.id == nodeId) {
+        widget.onImageAlignSet?.call(imageIndex, align);
         return;
       }
       imageIndex++;
@@ -720,12 +746,15 @@ class SuperEditorBodyState extends State<SuperEditorBody>
                               _imageSelection.currentWidth)
                           .clamp(_imageSelection.columnWidth * 0.25,
                               _imageSelection.columnWidth),
+                      currentAlign: _imageSelection.previewAlign.value ??
+                          _imageSelection.currentAlign,
                       onView: _viewSelectedImageFullScreen,
                       onDelete: _deleteSelectedImage,
                       onClose: () => _hideImageMenu(),
                       onSliderChanged: (value) =>
                           _imageSelection.previewWidth.value = value,
                       onSliderCommit: _commitImageWidth,
+                      onAlignSet: _commitImageAlign,
                     ),
                   ),
                 ),
@@ -774,6 +803,20 @@ class SuperEditorBodyState extends State<SuperEditorBody>
     _imageReloadPending = true;
   }
 
+  /// Alignment button tap: same flow as the width slider - instant preview
+  /// via the selection state, precise markup rewrite in the parent, document
+  /// reload deferred to the menu close.
+  void _commitImageAlign(GjImageAlign align) {
+    final nodeId = _imageSelection.selectedNodeId.value;
+    if (nodeId == null) return;
+
+    _imageSelection.previewAlign.value = align;
+    _imageSelection.currentAlign = align;
+    _onImageAlignSet(nodeId, align);
+    _imageReloadPending = true;
+    _imageMenuEntry?.markNeedsBuild();
+  }
+
   void _viewSelectedImageFullScreen() {
     final provider = _imageSelection.provider;
     if (provider == null) return;
@@ -797,7 +840,7 @@ class SuperEditorBodyState extends State<SuperEditorBody>
 }
 
 const _imageMenuWidth = 240.0;
-const _imageMenuHeight = 128.0;
+const _imageMenuHeight = 168.0;
 
 /// Mutable state of the long-press image selection, shared with the
 /// [GjImageComponent]s through [GjImageScope].
@@ -807,10 +850,15 @@ class _ImageSelection {
   /// Live slider preview width for the selected image (logical px).
   final previewWidth = ValueNotifier<double?>(null);
 
+  /// Live preview alignment for the selected image, until the rewritten
+  /// markup lands with the document reload on menu close.
+  final previewAlign = ValueNotifier<GjImageAlign?>(null);
+
   Rect? Function()? rectGetter;
   ImageProvider? provider;
   double columnWidth = 0;
   double currentWidth = 0;
+  GjImageAlign currentAlign = GjImageAlign.left;
 
   /// Set by [SuperEditorBodyState]; fires the menu/selection flow.
   VoidCallback? onSelectRequest;
@@ -824,14 +872,17 @@ class _ImageSelection {
     required Rect? Function() rectGetter,
     required double columnWidth,
     required double currentWidth,
+    required GjImageAlign currentAlign,
     ImageProvider? provider,
   }) {
     this.rectGetter = rectGetter;
     this.columnWidth = columnWidth;
     this.currentWidth = currentWidth;
+    this.currentAlign = currentAlign;
     this.provider = provider;
     if (selectedNodeId.value != nodeId) {
       previewWidth.value = null;
+      previewAlign.value = null;
     }
     selectedNodeId.value = nodeId;
     onSelectRequest?.call();
@@ -840,6 +891,8 @@ class _ImageSelection {
   void clear() {
     selectedNodeId.value = null;
     previewWidth.value = null;
+    previewAlign.value = null;
+    currentAlign = GjImageAlign.left;
     rectGetter = null;
     provider = null;
   }
@@ -905,21 +958,25 @@ class _ImageSelectionMenu extends StatelessWidget {
   final double sliderMin;
   final double sliderMax;
   final double sliderValue;
+  final GjImageAlign currentAlign;
   final VoidCallback onView;
   final VoidCallback onDelete;
   final VoidCallback onClose;
   final ValueChanged<double> onSliderChanged;
   final ValueChanged<double> onSliderCommit;
+  final ValueChanged<GjImageAlign> onAlignSet;
 
   const _ImageSelectionMenu({
     required this.sliderMin,
     required this.sliderMax,
     required this.sliderValue,
+    required this.currentAlign,
     required this.onView,
     required this.onDelete,
     required this.onClose,
     required this.onSliderChanged,
     required this.onSliderCommit,
+    required this.onAlignSet,
   });
 
   @override
@@ -928,6 +985,7 @@ class _ImageSelectionMenu extends StatelessWidget {
     final loc = context.loc;
     final destructive =
         tokens?.destructive ?? Theme.of(context).colorScheme.error;
+    final accent = tokens?.accent ?? Theme.of(context).colorScheme.secondary;
 
     return FocusScope(
       // 浮层绝不抢焦点（jotsy 教训）：抢了键盘就收。
@@ -1021,6 +1079,48 @@ class _ImageSelectionMenu extends StatelessWidget {
                                 '${((sliderValue / sliderMax) * 100).round()}%',
                             onChanged: onSliderChanged,
                             onChangeEnd: onSliderCommit,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Divider(height: 1, color: tokens?.edge ?? Colors.black12),
+                  SizedBox(
+                    height: 40,
+                    child: Row(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(left: 12),
+                          child: Text(loc.imageMenuAlign,
+                              style: Theme.of(context).textTheme.bodyMedium),
+                        ),
+                        Expanded(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              for (final entry in const [
+                                (GjImageAlign.left, Icons.format_align_left),
+                                (GjImageAlign.center,
+                                    Icons.format_align_center),
+                                (GjImageAlign.right,
+                                    Icons.format_align_right),
+                              ])
+                                IconButton(
+                                  // 紧凑 32px：三个钮必须挤进菜单剩余的
+                                  // ~100px 宽度（默认 40px 会溢出）。
+                                  constraints: const BoxConstraints.tightFor(
+                                      width: 32, height: 32),
+                                  padding: EdgeInsets.zero,
+                                  icon: Icon(
+                                    entry.$2,
+                                    size: 20,
+                                    color: currentAlign == entry.$1
+                                        ? accent
+                                        : null,
+                                  ),
+                                  onPressed: () => onAlignSet(entry.$1),
+                                ),
+                            ],
                           ),
                         ),
                       ],
@@ -1286,10 +1386,14 @@ class GjImageScope extends InheritedWidget {
   final String imageDir;
   final _ImageSelection selection;
 
+  /// Alignment for images without a `c`/`r` markup letter (global default).
+  final GjImageAlign defaultImageAlign;
+
   const GjImageScope({
     super.key,
     required this.imageDir,
     required this.selection,
+    required this.defaultImageAlign,
     required super.child,
   });
 
@@ -1301,7 +1405,9 @@ class GjImageScope extends InheritedWidget {
 
   @override
   bool updateShouldNotify(GjImageScope oldWidget) =>
-      imageDir != oldWidget.imageDir || selection != oldWidget.selection;
+      imageDir != oldWidget.imageDir ||
+      selection != oldWidget.selection ||
+      defaultImageAlign != oldWidget.defaultImageAlign;
 }
 
 /// Renders [ImageNode]s inline in the editor flow: local images from the
@@ -1405,9 +1511,11 @@ class _GjImageComponentState extends State<GjImageComponent> {
       _watchedSelection?.selectedNodeId
           .removeListener(_onSelectionStateChanged);
       _watchedSelection?.previewWidth.removeListener(_onSelectionStateChanged);
+      _watchedSelection?.previewAlign.removeListener(_onSelectionStateChanged);
       _watchedSelection = selection;
       selection.selectedNodeId.addListener(_onSelectionStateChanged);
       selection.previewWidth.addListener(_onSelectionStateChanged);
+      selection.previewAlign.addListener(_onSelectionStateChanged);
     }
   }
 
@@ -1415,6 +1523,7 @@ class _GjImageComponentState extends State<GjImageComponent> {
   void dispose() {
     _watchedSelection?.selectedNodeId.removeListener(_onSelectionStateChanged);
     _watchedSelection?.previewWidth.removeListener(_onSelectionStateChanged);
+    _watchedSelection?.previewAlign.removeListener(_onSelectionStateChanged);
     if (_imageListener != null) {
       _imageStream?.removeListener(_imageListener!);
     }
@@ -1454,9 +1563,13 @@ class _GjImageComponentState extends State<GjImageComponent> {
     final match = imageUrlWidthSuffixRegex.firstMatch(widget.imageUrl);
     var imagePath = widget.imageUrl;
     double? width;
+    GjImageAlign? markupAlign;
     if (match != null) {
       imagePath = match.group(1)!;
-      width = double.parse(match.group(2)!);
+      if (match.group(2) != null) {
+        width = double.parse(match.group(2)!);
+      }
+      markupAlign = imageUrlAlign(widget.imageUrl);
     }
 
     return LayoutBuilder(builder: (context, constraints) {
@@ -1466,6 +1579,12 @@ class _GjImageComponentState extends State<GjImageComponent> {
       // 视觉无缝。
       final effectiveWidth =
           (isSelected ? selection.previewWidth.value : null) ?? width;
+      // 对齐同理：菜单点击先走实时预览，写回后由 markup 字母后缀接管。
+      // 单图字母后缀优先，无后缀落到全局默认。
+      final effectiveAlign = (isSelected ? selection.previewAlign.value : null) ??
+          markupAlign ??
+          scope.defaultImageAlign;
+      final alignDirectional = effectiveAlign.toAlignmentDirectional();
       // `|width` is a maximum width: smaller images keep their natural size,
       // larger ones scale down to fit. No suffix: the full column width.
       final displayMaxWidth = (effectiveWidth != null
@@ -1479,7 +1598,7 @@ class _GjImageComponentState extends State<GjImageComponent> {
 
       final content = isLongImage
           ? _buildFoldedImage(provider!, displayMaxWidth, theme)
-          : _buildImage(provider, theme);
+          : _buildImage(provider, theme, alignDirectional);
 
       // The inner recognizers sit deeper in the tree than the document
       // gesture system's, so they win the arena. (opaque: BoxComponent 链不
@@ -1506,11 +1625,12 @@ class _GjImageComponentState extends State<GjImageComponent> {
               columnWidth: maxWidth,
               currentWidth:
                   current != null ? math.min(current, maxWidth) : maxWidth,
+              currentAlign: effectiveAlign,
               provider: provider,
             );
           },
           child: Align(
-            alignment: AlignmentDirectional.centerStart,
+            alignment: alignDirectional,
             child: ConstrainedBox(
               constraints: BoxConstraints(maxWidth: displayMaxWidth),
               child:
@@ -1562,7 +1682,8 @@ class _GjImageComponentState extends State<GjImageComponent> {
     );
   }
 
-  Widget _buildImage(ImageProvider? provider, ThemeData theme) {
+  Widget _buildImage(
+      ImageProvider? provider, ThemeData theme, AlignmentDirectional alignment) {
     if (provider == null) {
       return Container(
         padding: const EdgeInsets.all(16),
@@ -1578,7 +1699,7 @@ class _GjImageComponentState extends State<GjImageComponent> {
     return Image(
       image: provider,
       fit: BoxFit.scaleDown,
-      alignment: AlignmentDirectional.centerStart,
+      alignment: alignment,
       frameBuilder: expressiveImageFrameBuilder,
       errorBuilder: (context, error, stackTrace) => Container(
         padding: const EdgeInsets.all(16),
