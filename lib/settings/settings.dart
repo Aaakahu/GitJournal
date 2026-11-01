@@ -10,6 +10,7 @@ import 'package:gitjournal/core/folder/sorting_mode.dart';
 import 'package:gitjournal/core/notes/note.dart';
 import 'package:gitjournal/folder_views/common_types.dart';
 import 'package:gitjournal/l10n.dart';
+import 'package:gitjournal/utils/markdown.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:universal_io/io.dart';
 import 'package:uuid/uuid.dart';
@@ -60,6 +61,10 @@ class Settings extends ChangeNotifier with SettingsSharedPref {
   SettingsMarkdownDefaultView markdownLastUsedView =
       SettingsMarkdownDefaultView.Edit;
 
+  /// Default horizontal alignment of images whose markup carries no `c`/`r`
+  /// suffix letter (the per-image letter always wins over this).
+  SettingsImageAlign imageDefaultAlign = SettingsImageAlign.Default;
+
   bool zenMode = false;
 
   bool swipeToDelete = true;
@@ -85,6 +90,9 @@ class Settings extends ChangeNotifier with SettingsSharedPref {
     if (markdownLastUsedView == SettingsMarkdownDefaultView.LastUsed) {
       markdownLastUsedView = SettingsMarkdownDefaultView.Edit;
     }
+
+    imageDefaultAlign = SettingsImageAlign.fromInternalString(
+        getString("imageDefaultAlign"));
 
     version = getInt("settingsVersion") ?? version;
     emojiParser = getBool("emojiParser") ?? emojiParser;
@@ -124,6 +132,10 @@ class Settings extends ChangeNotifier with SettingsSharedPref {
         "markdownLastUsedView",
         markdownLastUsedView.toInternalString(),
         def.markdownLastUsedView.toInternalString());
+    await setString(
+        "imageDefaultAlign",
+        imageDefaultAlign.toInternalString(),
+        def.imageDefaultAlign.toInternalString());
     await setBool("emojiParser", emojiParser, def.emojiParser);
     await setString("homeScreen", homeScreen.toInternalString(),
         def.homeScreen.toInternalString());
@@ -155,6 +167,7 @@ class Settings extends ChangeNotifier with SettingsSharedPref {
       "version": version.toString(),
       'markdownDefaultView': markdownDefaultView.toInternalString(),
       'markdownLastUsedView': markdownLastUsedView.toInternalString(),
+      'imageDefaultAlign': imageDefaultAlign.toInternalString(),
       'homeScreen': homeScreen.toInternalString(),
       'theme': theme.toInternalString(),
       'lightTheme': lightTheme,
@@ -386,6 +399,38 @@ class SettingsMarkdownDefaultView extends GjSetting {
           BuildContext context, String str) =>
       GjSetting.fromPublicString(context, options, Default, str)
           as SettingsMarkdownDefaultView;
+}
+
+class SettingsImageAlign extends GjSetting {
+  static const Left = SettingsImageAlign(Lk.settingsImagesDefaultAlignLeft, "left");
+  static const Center =
+      SettingsImageAlign(Lk.settingsImagesDefaultAlignCenter, "center");
+  static const Right =
+      SettingsImageAlign(Lk.settingsImagesDefaultAlignRight, "right");
+  static const Default = Left;
+
+  const SettingsImageAlign(super.lk, super.str);
+
+  static const options = <SettingsImageAlign>[
+    Left,
+    Center,
+    Right,
+  ];
+
+  static SettingsImageAlign fromInternalString(String? str) =>
+      GjSetting.fromInternalString(options, Default, str)
+          as SettingsImageAlign;
+
+  static SettingsImageAlign fromPublicString(
+          BuildContext context, String str) =>
+      GjSetting.fromPublicString(context, options, Default, str)
+          as SettingsImageAlign;
+
+  GjImageAlign toImageAlign() {
+    if (this == Center) return GjImageAlign.center;
+    if (this == Right) return GjImageAlign.right;
+    return GjImageAlign.left;
+  }
 }
 
 class SettingsHomeScreen extends GjSetting {

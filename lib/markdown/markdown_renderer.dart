@@ -142,8 +142,14 @@ class MarkdownRenderer extends StatelessWidget {
         double? width;
         if (match != null) {
           imagePath = Uri.parse(match.group(1)!);
-          width = double.parse(match.group(2)!);
+          if (match.group(2) != null) {
+            width = double.parse(match.group(2)!);
+          }
         }
+
+        // 单图 `c`/`r` 字母后缀优先；无后缀落到全局默认对齐。
+        final align = imageUrlAlign(url.toString()) ??
+            settings.imageDefaultAlign.toImageAlign();
 
         void Function()? onToggleWidth;
         if (onImageWidthChange != null && imageMatches != null) {
@@ -160,6 +166,7 @@ class MarkdownRenderer extends StatelessWidget {
           width: width,
           titel: title,
           altText: alt,
+          alignment: align.toAlignmentDirectional(),
           onToggleWidth: onToggleWidth,
         );
       },

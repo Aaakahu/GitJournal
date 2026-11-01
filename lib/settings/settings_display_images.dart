@@ -10,9 +10,11 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:gitjournal/l10n.dart';
 import 'package:gitjournal/settings/markdown_renderer_config.dart';
+import 'package:gitjournal/settings/settings.dart';
 import 'package:gitjournal/settings/settings_display_images_caption.dart';
 import 'package:gitjournal/settings/settings_display_images_theming.dart';
 import 'package:gitjournal/settings/widgets/settings_header.dart';
+import 'package:gitjournal/settings/widgets/settings_list_preference.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
@@ -29,6 +31,7 @@ class SettingsDisplayImagesScreenState
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<MarkdownRendererConfig>();
+    final appSettings = context.watch<Settings>();
     final theme = Theme.of(context);
 
     final body = ListView(children: <Widget>[
@@ -54,6 +57,20 @@ class SettingsDisplayImagesScreenState
                 const RouteSettings(name: '/settings/display_images/caption'),
           );
           Navigator.push(context, route);
+        },
+      ),
+      ListPreference(
+        title: context.loc.settingsImagesDefaultAlign,
+        currentOption: appSettings.imageDefaultAlign.toPublicString(context),
+        options: SettingsImageAlign.options
+            .map((f) => f.toPublicString(context))
+            .toList(),
+        onChange: (String publicStr) {
+          setState(() {
+            appSettings.imageDefaultAlign =
+                SettingsImageAlign.fromPublicString(context, publicStr);
+            appSettings.save();
+          });
         },
       ),
       SettingsHeader(context.loc.settingsDisplayImagesDetailsViewHeader),

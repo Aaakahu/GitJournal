@@ -27,6 +27,7 @@ import 'package:gitjournal/logger/logger.dart';
 import 'package:gitjournal/markdown/markdown_renderer.dart';
 import 'package:gitjournal/markdown/rich_editor_safety.dart';
 import 'package:gitjournal/settings/app_config.dart';
+import 'package:gitjournal/settings/settings.dart';
 import 'package:gitjournal/utils/markdown.dart';
 import 'package:gitjournal/utils/utils.dart';
 import 'package:path/path.dart' as p;
@@ -195,6 +196,11 @@ class MarkdownEditorState extends State<MarkdownEditor>
         autofocus: widget.editMode,
         onChanged: _richTextChanged,
         onImageWidthSet: _onRichImageWidthSet,
+        onImageAlignSet: _onRichImageAlignSet,
+        defaultImageAlign: context
+                .watch<Settings>()
+                .imageDefaultAlign
+                .toImageAlign(),
       );
     } else {
       bodyEditor = NoteBodyEditor(
