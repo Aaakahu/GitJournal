@@ -8,6 +8,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/gestures.dart' show kTouchSlop;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:gitjournal/app/theme/expressive_motion.dart';
 import 'package:gitjournal/l10n.dart';
 import 'package:gitjournal/markdown/gj_markdown_serializers.dart';
@@ -64,6 +65,10 @@ class SuperEditorBodyState extends State<SuperEditorBody>
   late MutableDocument _document;
   late MutableDocumentComposer _composer;
   late Editor _editor;
+
+  // Owned focus node handed to the SuperEditor widget, so the blank-area
+  // tap fallback can re-focus the editor without digging into its tree.
+  final FocusNode _editorFocusNode = FocusNode();
 
   /// Locates the laid-out document for selection-rect queries (format toolbar
   /// positioning).
@@ -137,6 +142,7 @@ class SuperEditorBodyState extends State<SuperEditorBody>
     widget.textController.removeListener(_onControllerChanged);
     _editor.dispose();
     _composer.dispose();
+    _editorFocusNode.dispose();
     super.dispose();
   }
 
@@ -340,6 +346,7 @@ class SuperEditorBodyState extends State<SuperEditorBody>
       selection: _imageSelection,
       child: SuperEditor(
         editor: _editor,
+        focusNode: _editorFocusNode,
         autofocus: widget.autofocus,
         // The outer CustomScrollView owns scrolling.
         shrinkWrap: true,
@@ -352,6 +359,64 @@ class SuperEditorBodyState extends State<SuperEditorBody>
         ],
       ),
     );
+  }
+
+  // ---------------------------------------------------------------------------
+  // 空白区点击兜底：super_editor 只在点击命中"文字内容"时才放光标——短便签
+  // 末尾以下的空白是死区（点击落在 SuperEditor 自身渲染盒之外，原生手势层
+  // 根本收不到事件）。兜底层由 SuperEditorTapFallback（裸 Listener，不进
+  // 手势竞技场）在 pointer up 时调进来：只有"没命中任何内容、且点击位于
+  // 文档内容末尾之下"才认领，光标落到最末节点的后缘（图片后缘）。在那儿
+  // 打字时 super_editor 的 IME 层会自动在图片后新起段落承载文字
+  // （document_delta_editing._insertPlainText 对 UpstreamDownstreamNodePosition
+  // 光标先 InsertNewlineAtCaretRequest）。文档盒内部的块间空隙由原生手势层
+  // 的 nearest 语义处理，兜底层不掺和。
+  // ---------------------------------------------------------------------------
+
+  /// Claims a tap on the whitespace below the document content: moves the
+  /// collapsed caret to the end of the last node, focuses the editor and
+  /// raises the keyboard. Returns whether the tap was claimed.
+  bool claimBlankTap(Offset globalPosition) {
+    // 浮条/图片菜单打开期间，点击归它们（按钮、菜单外点击关闭）；不顺手
+    // 挪光标——那会把正在应用的选区（如点加粗前）打没。
+    if (_toolbarEntry != null ||
+        _imageMenuEntry != null ||
+        _imageSelection.isActive) {
+      return false;
+    }
+
+    final layout = _documentLayoutKey.currentState as DocumentLayout?;
+    if (layout == null) return false;
+
+    final docOffset = layout.getDocumentOffsetFromAncestorOffset(globalPosition);
+    // 命中内容（文字、图片本体）的点击归 super_editor 原生手势层：
+    // 选区、拖选、图片长按一个都不能抢。
+    if (layout.getDocumentPositionAtOffset(docOffset) != null) return false;
+
+    // 没命中内容：只有"最近位置 = 最末节点后缘"（即点击在内容末尾之下）
+    // 才认领；文档盒内部的空隙原生层已按 nearest 放光标。
+    final nearest = layout.getDocumentPositionNearestToOffset(docOffset);
+    final lastNode =
+        _document.nodeCount > 0 ? _document.getNodeAt(_document.nodeCount - 1) : null;
+    if (nearest == null || lastNode == null || nearest.nodeId != lastNode.id) {
+      return false;
+    }
+
+    _editor.execute([
+      ChangeSelectionRequest(
+        DocumentSelection.collapsed(position: nearest),
+        SelectionChangeType.placeCaret,
+        SelectionReason.userInteraction,
+      ),
+    ]);
+    _editorFocusNode.requestFocus();
+    _showKeyboard();
+    return true;
+  }
+
+  void _showKeyboard() {
+    // 用户点空白就是为了打字。尽力而为：没有 IME 连接时（如测试环境）静默。
+    SystemChannels.textInput.invokeMethod('TextInput.show').catchError((_) {});
   }
 
   void _onImageWidthSet(String nodeId, double? widthOrNull) {
@@ -1772,6 +1837,47 @@ class _LongImageBadge extends StatelessWidget {
         context.loc.widgetsLongImageBadge,
         style: theme.textTheme.labelSmall,
       ),
+    );
+  }
+}
+
+/// Raw-pointer tap fallback for the dead zones around the document content
+/// (the blank space below a short note etc.). A [Listener] on purpose: raw
+/// listeners don't enter the gesture arena, so super_editor's native
+/// tap/drag/long-press recognizers always win for pointers they claim;
+/// this only routes taps that nobody else acts on into
+/// [SuperEditorBodyState.claimBlankTap].
+class SuperEditorTapFallback extends StatefulWidget {
+  final GlobalKey<SuperEditorBodyState> bodyKey;
+  final Widget child;
+
+  const SuperEditorTapFallback({
+    super.key,
+    required this.bodyKey,
+    required this.child,
+  });
+
+  @override
+  State<SuperEditorTapFallback> createState() => _SuperEditorTapFallbackState();
+}
+
+class _SuperEditorTapFallbackState extends State<SuperEditorTapFallback> {
+  Offset? _downPosition;
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (event) => _downPosition = event.position,
+      onPointerUp: (event) {
+        final down = _downPosition;
+        _downPosition = null;
+        if (down == null) return;
+        // A drag (scroll) is not a tap.
+        if ((event.position - down).distance > kTouchSlop) return;
+        widget.bodyKey.currentState?.claimBlankTap(event.position);
+      },
+      child: widget.child,
     );
   }
 }

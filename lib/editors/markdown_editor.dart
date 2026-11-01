@@ -223,23 +223,28 @@ class MarkdownEditorState extends State<MarkdownEditor>
         initialEntries: [
           OverlayEntry(
             builder: (context) => Positioned.fill(
-              child: CustomScrollView(
-                controller: _scrollController,
-                slivers: <Widget>[
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 0.0),
-                    sliver: SliverToBoxAdapter(
-                      child: NoteTitleEditor(
-                        _titleTextController,
-                        _noteTitleTextChanged,
+              // 空白区点击兜底：短便签内容末尾以下的空白要能放光标打字。
+              // 见 SuperEditorTapFallback（裸 Listener，不进手势竞技场）。
+              child: SuperEditorTapFallback(
+                bodyKey: _richBodyEditorKey,
+                child: CustomScrollView(
+                  controller: _scrollController,
+                  slivers: <Widget>[
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 0.0),
+                      sliver: SliverToBoxAdapter(
+                        child: NoteTitleEditor(
+                          _titleTextController,
+                          _noteTitleTextChanged,
+                        ),
                       ),
                     ),
-                  ),
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16.0, 0.0, 16.0, 16.0),
-                    sliver: bodyEditor,
-                  ),
-                ],
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16.0, 0.0, 16.0, 16.0),
+                      sliver: bodyEditor,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

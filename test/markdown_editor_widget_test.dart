@@ -294,6 +294,85 @@ void main() {
     expect(downstreamEdge!.height, closeTo(16 * 1.45, 0.5));
   });
 
+  testWidgets('Tapping the blank space below a short note drops the caret '
+      'at the document end (image edge)', (tester) async {
+    var note = buildNote("Hello\n\n![x](./a.jpg)", title: "Img");
+
+    var errors = await pumpEditor(tester, note);
+    expect(errors, isEmpty);
+
+    final superEditor = tester.widget<SuperEditor>(find.byType(SuperEditor));
+    final editor = superEditor.editor;
+    final imageId =
+        editor.document.toList().whereType<ImageNode>().first.id;
+
+    // The test surface is much taller than this note's content: everything
+    // below the trailing image is dead space for super_editor's native
+    // gesture layer. The fallback must park the caret on the image's
+    // trailing edge. (Tap point computed from the content edge; the screen
+    // bottom is occupied by the editor's bottom bar.)
+    final editorRect = tester.getRect(find.byType(GjImageComponent));
+    await tester.tapAt(Offset(400, editorRect.bottom + 100));
+    await tester.pump();
+
+    final selection = editor.composer.selection;
+    expect(selection, isNotNull);
+    expect(selection!.isCollapsed, isTrue);
+    expect(selection.extent.nodeId, imageId);
+    expect(
+      selection.extent.nodePosition,
+      const UpstreamDownstreamNodePosition.downstream(),
+    );
+  });
+
+  testWidgets('Typing after a blank-space tap starts a fresh paragraph after '
+      'the trailing image', (tester) async {
+    var note = buildNote("Hello\n\n![x](./a.jpg)", title: "Img");
+
+    var errors = await pumpEditor(tester, note);
+    expect(errors, isEmpty);
+
+    final superEditor = tester.widget<SuperEditor>(find.byType(SuperEditor));
+    final editor = superEditor.editor;
+
+    final editorRect = tester.getRect(find.byType(GjImageComponent));
+    await tester.tapAt(Offset(400, editorRect.bottom + 100));
+    await tester.pump();
+
+    // The on-device IME path (document_delta_editing._insertPlainText) runs
+    // exactly these two steps for a caret sitting on an image edge: first a
+    // block newline (spawns a paragraph after the image), then the text.
+    editor.execute([InsertNewlineAtCaretRequest()]);
+    await tester.pump();
+    editor.execute([
+      InsertTextRequest(
+        documentPosition: editor.composer.selection!.extent,
+        textToInsert: 'typed',
+        attributions: {},
+      ),
+    ]);
+
+    // 图片后新起段落承载文字，图片节点仍在其前。
+    final nodes = editor.document.toList();
+    expect(nodes.length, 3);
+    expect(nodes[0], isA<ParagraphNode>());
+    expect(nodes[1], isA<ImageNode>());
+    expect((nodes[2] as ParagraphNode).text.toPlainText(), 'typed');
+
+    // 序列化 markdown：图片 markup 在 typed 文字之前。
+    final bodyState =
+        tester.state<SuperEditorBodyState>(find.byType(SuperEditorBody));
+    bodyState.flushPendingWrite();
+    await tester.pump();
+
+    final body =
+        tester.state<MarkdownEditorState>(find.byType(MarkdownEditor))
+            .getNote()
+            .body;
+    expect(body, contains('typed'));
+    expect(body.indexOf('![x](./a.jpg)'), lessThan(body.indexOf('typed')));
+  });
+
   testWidgets('Focus change after an external reload keeps the old composer '
       'usable (regression: Cannot add new events after calling close)',
       (tester) async {
