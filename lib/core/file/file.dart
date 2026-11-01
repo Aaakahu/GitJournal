@@ -145,10 +145,6 @@ class File {
 //
 
 // FolderView -> make it show IgnoredFiles as well
-//            -> When clicking on an IgnoredFile allow it to be opened
-//               via the RawEditor
-
-// RawEditor(File file) -> add supports(File file)
 
 // TextFile can have the (text + encoding) + File
 //   alternatives -> body / data

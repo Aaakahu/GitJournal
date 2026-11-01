@@ -25,7 +25,6 @@ import 'package:gitjournal/settings/app_config.dart';
 import 'package:gitjournal/settings/settings.dart';
 import 'package:gitjournal/settings/settings_screen.dart';
 import 'package:gitjournal/settings/storage_config.dart';
-import 'package:gitjournal/utils/utils.dart';
 import 'package:gitjournal/widgets/setup.dart';
 
 class AppRoute {
@@ -142,11 +141,7 @@ class AppRouter {
     }
 
     if (route.startsWith(AppRoute.NewNotePrefix)) {
-      var type = route.substring(AppRoute.NewNotePrefix.length);
-      var et = SettingsEditorType.fromInternalString(type).toEditorType();
-
       Log.i("New Note - $route");
-      Log.i("EditorType: $et");
 
       var rootFolder = repository.rootFolder;
 
@@ -160,11 +155,12 @@ class AppRouter {
 
       callbackIfUsedShared();
 
-      var folder = getFolderForEditor(settings, rootFolder, et);
+      var folder =
+          rootFolder.getFolderWithSpec(settings.defaultNewNoteFolderSpec) ??
+              rootFolder;
       return NoteEditor.newNote(
         folder,
         folder,
-        et,
         existingText: sharedText,
         existingImages: sharedImages,
         newNoteExtraProps: extraProps,

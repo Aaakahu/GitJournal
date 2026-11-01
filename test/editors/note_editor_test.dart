@@ -10,7 +10,6 @@ import 'package:dart_git/plumbing/git_hash.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gitjournal/change_notifiers.dart';
-import 'package:gitjournal/editors/common_types.dart';
 import 'package:gitjournal/editors/note_body_editor.dart';
 import 'package:gitjournal/editors/note_editor.dart';
 import 'package:gitjournal/editors/note_title_editor.dart';
@@ -69,7 +68,6 @@ void main() {
     var widget = NoteEditor.newNote(
       repo.rootFolder,
       repo.rootFolder,
-      EditorType.Markdown,
       existingText: "",
       existingImages: const [],
     );
@@ -102,7 +100,6 @@ void main() {
     var widget = NoteEditor.newNote(
       repo.rootFolder,
       repo.rootFolder,
-      EditorType.Markdown,
       existingText: "",
       existingImages: const [],
       newNoteExtraProps: const {'foo': 1},

@@ -8,7 +8,6 @@ import 'package:path/path.dart' as p;
 
 import 'package:gitjournal/core/file/file.dart';
 import 'package:gitjournal/core/folder/notes_folder_config.dart';
-import 'package:gitjournal/editors/common_types.dart';
 import '../note.dart';
 
 class NoteN extends File {
@@ -43,17 +42,6 @@ class NoteFileFormatInfo {
         return '.org';
       case NoteFileFormat.Txt:
         return ".txt";
-    }
-  }
-
-  static EditorType defaultEditor(NoteFileFormat format) {
-    switch (format) {
-      case NoteFileFormat.Markdown:
-        return EditorType.Markdown;
-      case NoteFileFormat.Txt:
-        return EditorType.Raw;
-      case NoteFileFormat.OrgMode:
-        return EditorType.Org;
     }
   }
 

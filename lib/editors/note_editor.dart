@@ -20,14 +20,9 @@ import 'package:gitjournal/core/note_storage.dart';
 import 'package:gitjournal/core/notes/note.dart';
 import 'package:gitjournal/core/views/first_image_view.dart';
 import 'package:gitjournal/core/views/inline_tags_view.dart';
-import 'package:gitjournal/editors/checklist_editor.dart';
 import 'package:gitjournal/editors/common.dart';
-import 'package:gitjournal/editors/common_types.dart';
 import 'package:gitjournal/editors/editing_session_registry.dart';
-import 'package:gitjournal/editors/journal_editor.dart';
 import 'package:gitjournal/editors/markdown_editor.dart';
-import 'package:gitjournal/editors/org_editor.dart';
-import 'package:gitjournal/editors/raw_editor.dart';
 import 'package:gitjournal/error_reporting.dart';
 import 'package:gitjournal/l10n.dart';
 import 'package:gitjournal/logger/logger.dart';
@@ -45,18 +40,15 @@ import 'package:universal_io/io.dart' as io;
 
 class ShowUndoSnackbar {}
 
-/// Certain Editors only support certain file formats. We can create an
-///   editor either by -
-
-///   * Giving it a Note, and letting it choose an editor based on the
-///     default or note metadata
+/// The editor is always the Markdown editor (super_editor rich text with an
+/// internal plain-text fallback). It can be created either by -
+///
+///   * Giving it a Note
 ///   * New Note with a file type
-///   * New Note with a editor type + possible file type
 class NoteEditor extends StatefulWidget {
   final Note? existingNote;
   final NotesFolderFS notesFolder;
   final NotesFolder parentFolderView;
-  final EditorType? defaultEditorType;
   final NoteFileFormat? defaultFileFormat;
 
   final String? existingText;
@@ -75,7 +67,6 @@ class NoteEditor extends StatefulWidget {
     this.highlightString,
   })  : existingNote = note,
         notesFolder = note.parent,
-        defaultEditorType = null,
         defaultFileFormat = null,
         existingText = null,
         existingImages = null,
@@ -86,8 +77,7 @@ class NoteEditor extends StatefulWidget {
 
   const NoteEditor.newNote(
     this.notesFolder,
-    this.parentFolderView,
-    this.defaultEditorType, {
+    this.parentFolderView, {
     required String this.existingText,
     required List<String> this.existingImages,
     this.newNoteExtraProps = const {},
@@ -102,13 +92,6 @@ class NoteEditor extends StatefulWidget {
     if (existingNote == null) {
       var fileFormat = defaultFileFormat ??
           notesFolder.config.defaultFileFormat.toFileFormat();
-
-      if (defaultEditorType != null) {
-        var editor = defaultEditorType!;
-        if (!editorSupported(fileFormat, editor)) {
-          fileFormat = defaultFormat(editor);
-        }
-      }
 
       return NoteEditorState.newNote(
         notesFolder,
@@ -131,15 +114,10 @@ class NoteEditorState extends State<NoteEditor>
   late final bool _isNewNote;
 
   bool _newNoteRenamed = false;
-  late EditorType _editorType;
   MdYamlDoc _originalNoteData = MdYamlDoc();
   GitHash? _originalNoteOid;
 
-  final _rawEditorKey = GlobalKey<RawEditorState>();
   final _markdownEditorKey = GlobalKey<MarkdownEditorState>();
-  final _checklistEditorKey = GlobalKey<ChecklistEditorState>();
-  final _journalEditorKey = GlobalKey<JournalEditorState>();
-  final _orgEditorKey = GlobalKey<OrgEditorState>();
 
   final _lock = Lock();
 
@@ -206,28 +184,6 @@ class NoteEditorState extends State<NoteEditor>
       _originalNoteData = _note.data;
 
       _isNewNote = false;
-    }
-
-    // Select the editor
-    if (widget.defaultEditorType != null) {
-      _editorType = widget.defaultEditorType!;
-    } else if (widget.defaultFileFormat != null) {
-      _editorType = NoteFileFormatInfo.defaultEditor(widget.defaultFileFormat!);
-    } else {
-      switch (_note.type) {
-        case NoteType.Journal:
-          _editorType = EditorType.Journal;
-          break;
-        case NoteType.Checklist:
-          _editorType = EditorType.Checklist;
-          break;
-        case NoteType.Org:
-          _editorType = EditorType.Org;
-          break;
-        case NoteType.Unknown:
-          _editorType = widget.notesFolder.config.defaultEditor.toEditorType();
-          break;
-      }
     }
 
     _renewLease();
@@ -302,59 +258,16 @@ class NoteEditorState extends State<NoteEditor>
   Widget _getEditor() {
     var note = _note;
 
-    switch (_editorType) {
-      case EditorType.Markdown:
-        return MarkdownEditor(
-          key: _markdownEditorKey,
-          note: note,
-          parentFolder: widget.parentFolderView,
-          noteModified: _noteModified(note),
-          editMode: widget.editMode,
-          highlightString: widget.highlightString,
-          theme: Theme.of(context),
-          common: this,
-        );
-      case EditorType.Raw:
-        return RawEditor(
-          key: _rawEditorKey,
-          note: note,
-          noteModified: _noteModified(note),
-          editMode: widget.editMode,
-          highlightString: widget.highlightString,
-          theme: Theme.of(context),
-          common: this,
-        );
-      case EditorType.Checklist:
-        return ChecklistEditor(
-          key: _checklistEditorKey,
-          note: note,
-          noteModified: _noteModified(note),
-          editMode: widget.editMode,
-          highlightString: widget.highlightString,
-          theme: Theme.of(context),
-          common: this,
-        );
-      case EditorType.Journal:
-        return JournalEditor(
-          key: _journalEditorKey,
-          note: note,
-          noteModified: _noteModified(note),
-          editMode: widget.editMode,
-          highlightString: widget.highlightString,
-          theme: Theme.of(context),
-          common: this,
-        );
-      case EditorType.Org:
-        return OrgEditor(
-          key: _orgEditorKey,
-          note: note,
-          noteModified: _noteModified(note),
-          editMode: widget.editMode,
-          highlightString: widget.highlightString,
-          theme: Theme.of(context),
-          common: this,
-        );
-    }
+    return MarkdownEditor(
+      key: _markdownEditorKey,
+      note: note,
+      parentFolder: widget.parentFolderView,
+      noteModified: _noteModified(note),
+      editMode: widget.editMode,
+      highlightString: widget.highlightString,
+      theme: Theme.of(context),
+      common: this,
+    );
   }
 
   void _lockAndCall(Func1<Note, Future<void>> fn, Note note) {
@@ -434,30 +347,17 @@ class NoteEditorState extends State<NoteEditor>
 
     var newExt = p.extension(newFileName).toLowerCase();
 
-    // Change the editor
-    var format = NoteFileFormatInfo.fromFilePath(newFileName);
-    if (!editorSupported(format, _editorType)) {
-      var newEditorType = NoteFileFormatInfo.defaultEditor(format);
+    // Make sure this file type is supported
+    var config = note.parent.config;
+    if (!config.allowedFileExts.contains(newExt)) {
+      config.allowedFileExts.add(newExt);
+      config.save();
 
-      if (newEditorType != _editorType) {
-        setState(() {
-          _editorType = newEditorType;
-        });
-      }
-
-      // Make sure this file type is supported
-      var config = note.parent.config;
-      if (!config.allowedFileExts.contains(newExt)) {
-        config.allowedFileExts.add(newExt);
-        config.save();
-
-        var ext =
-            newExt.isNotEmpty ? newExt : context.loc.settingsFileTypesNoExt;
-        showSnackbar(
-          context,
-          context.loc.widgetsNoteEditorAddType(ext),
-        );
-      }
+      var ext = newExt.isNotEmpty ? newExt : context.loc.settingsFileTypesNoExt;
+      showSnackbar(
+        context,
+        context.loc.widgetsNoteEditorAddType(ext),
+      );
     }
   }
 
@@ -581,20 +481,7 @@ class NoteEditorState extends State<NoteEditor>
     return true;
   }
 
-  EditorState? _getEditorState() {
-    switch (_editorType) {
-      case EditorType.Markdown:
-        return _markdownEditorKey.currentState;
-      case EditorType.Raw:
-        return _rawEditorKey.currentState;
-      case EditorType.Checklist:
-        return _checklistEditorKey.currentState;
-      case EditorType.Journal:
-        return _journalEditorKey.currentState;
-      case EditorType.Org:
-        return _orgEditorKey.currentState;
-    }
-  }
+  EditorState? _getEditorState() => _markdownEditorKey.currentState;
 
   Note? _getNoteFromEditor() => _getEditorState()?.getNote();
 

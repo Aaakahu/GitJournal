@@ -14,7 +14,6 @@ import 'package:gitjournal/core/folder/sorted_notes_folder.dart';
 import 'package:gitjournal/core/folder/sorting_mode.dart';
 import 'package:gitjournal/core/markdown/md_yaml_doc_codec.dart';
 import 'package:gitjournal/core/note.dart';
-import 'package:gitjournal/editors/common_types.dart';
 import 'package:gitjournal/editors/note_editor.dart';
 import 'package:gitjournal/folder_views/common.dart';
 import 'package:gitjournal/folder_views/folder_view_configuration_dialog.dart';
@@ -249,7 +248,7 @@ class _FolderViewState extends State<FolderView> {
       key: const ValueKey("FAB"),
       // Zero-question new note: always Markdown, lands in the current view's
       // folder (All Notes view -> repo root, memo folder view -> that folder).
-      onPressed: () => _newPost(EditorType.Markdown),
+      onPressed: () => _newPost(),
       child: const Icon(Icons.add),
     );
 
@@ -261,14 +260,11 @@ class _FolderViewState extends State<FolderView> {
     );
   }
 
-  Future<void> _newPost(EditorType editorType) async {
+  Future<void> _newPost() async {
     var settings = context.read<Settings>();
 
     // The new note lands in the folder of the view it was created from.
     var fsFolder = widget.notesFolder.fsFolder as NotesFolderFS;
-
-    var routeType =
-        SettingsEditorType.fromEditorType(editorType).toInternalString();
 
     var extraProps = Map<String, dynamic>.from(widget.newNoteExtraProps);
     if (settings.customMetaData.isNotEmpty) {
@@ -281,12 +277,11 @@ class _FolderViewState extends State<FolderView> {
       NoteEditor.newNote(
         fsFolder,
         widget.notesFolder,
-        editorType,
         newNoteExtraProps: extraProps,
         existingText: "",
         existingImages: const [],
       ),
-      AppRoute.NewNotePrefix + routeType,
+      "${AppRoute.NewNotePrefix}Markdown",
     );
     await Navigator.push(context, route);
     ScaffoldMessenger.of(context).removeCurrentSnackBar();

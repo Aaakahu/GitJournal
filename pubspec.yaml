@@ -1,6 +1,6 @@
 name: gitjournal
 description: A Note Taking App Built on top of Git
-version: 1.90.15+28
+version: 1.90.16+29
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
@@ -70,7 +70,6 @@ dependencies:
   nested: ^1.0.0
   openssh_ed25519:
     git: https://github.com/GitJournal/openssh_ed25519.git
-  org_flutter: ^9.10.1
   package_info_plus: ^4.0.2
   path: ^1.8.0
   path_provider: ^2.0.11

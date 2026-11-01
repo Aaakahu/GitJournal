@@ -109,8 +109,6 @@ Future<void> openNoteEditor(
 bool openNewNoteEditor(BuildContext context, String noteSpec) {
   var rootFolder = context.read<NotesFolderFS>();
   var parentFolder = rootFolder;
-  var folderConfig = context.read<NotesFolderConfig>();
-  var defaultEditor = folderConfig.defaultEditor.toEditorType();
 
   var fileName = noteSpec;
   if (fileName.contains(p.separator)) {
@@ -128,12 +126,11 @@ bool openNewNoteEditor(BuildContext context, String noteSpec) {
     NoteEditor.newNote(
       parentFolder,
       parentFolder,
-      defaultEditor,
       newNoteFileName: fileName,
       existingText: "",
       existingImages: const [],
     ),
-    AppRoute.NewNotePrefix + folderConfig.defaultEditor.toInternalString(),
+    "${AppRoute.NewNotePrefix}Markdown",
   );
 
   Navigator.push(context, route);

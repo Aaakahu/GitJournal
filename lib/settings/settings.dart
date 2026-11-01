@@ -8,7 +8,6 @@
 import 'package:flutter/material.dart';
 import 'package:gitjournal/core/folder/sorting_mode.dart';
 import 'package:gitjournal/core/notes/note.dart';
-import 'package:gitjournal/editors/common_types.dart';
 import 'package:gitjournal/folder_views/common_types.dart';
 import 'package:gitjournal/l10n.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -46,8 +45,6 @@ class Settings extends ChangeNotifier with SettingsSharedPref {
   String customMetaData = "";
 
   String defaultNewNoteFolderSpec = "";
-  String journalEditordefaultNewNoteFolderSpec = "";
-  bool journalEditorSingleNote = false;
 
   RemoteSyncFrequency remoteSyncFrequency = RemoteSyncFrequency.Default;
 
@@ -77,11 +74,6 @@ class Settings extends ChangeNotifier with SettingsSharedPref {
   void load() {
     defaultNewNoteFolderSpec =
         getString("defaultNewNoteFolderSpec") ?? defaultNewNoteFolderSpec;
-    journalEditordefaultNewNoteFolderSpec =
-        getString("journalEditordefaultNewNoteFolderSpec") ??
-            journalEditordefaultNewNoteFolderSpec;
-    journalEditorSingleNote =
-        getBool("journalEditorSingleNote") ?? journalEditorSingleNote;
 
     remoteSyncFrequency = RemoteSyncFrequency.fromInternalString(
         getString("remoteSyncFrequency"));
@@ -121,12 +113,6 @@ class Settings extends ChangeNotifier with SettingsSharedPref {
     await setString("defaultNewNoteFolderSpec", defaultNewNoteFolderSpec,
         def.defaultNewNoteFolderSpec);
     await setString(
-        "journalEditordefaultNewNoteFolderSpec",
-        journalEditordefaultNewNoteFolderSpec,
-        def.journalEditordefaultNewNoteFolderSpec);
-    await setBool("journalEditorSingleNote", journalEditorSingleNote,
-        def.journalEditorSingleNote);
-    await setString(
         "remoteSyncFrequency",
         remoteSyncFrequency.toInternalString(),
         def.remoteSyncFrequency.toInternalString());
@@ -165,9 +151,6 @@ class Settings extends ChangeNotifier with SettingsSharedPref {
       "customMetaData": customMetaData,
       "defaultNewNoteFolderSpec":
           defaultNewNoteFolderSpec.isNotEmpty.toString(),
-      "journalEditordefaultNewNoteFolderSpec":
-          journalEditordefaultNewNoteFolderSpec,
-      'journalEditorSingleNote': journalEditorSingleNote.toString(),
       "remoteSyncFrequency": remoteSyncFrequency.toInternalString(),
       "version": version.toString(),
       'markdownDefaultView': markdownDefaultView.toInternalString(),
@@ -268,69 +251,6 @@ class RemoteSyncFrequency extends GjSetting {
           BuildContext context, String str) =>
       GjSetting.fromPublicString(context, options, Default, str)
           as RemoteSyncFrequency;
-}
-
-class SettingsEditorType extends GjSetting {
-  static const Markdown =
-      SettingsEditorType(Lk.settingsEditorsMarkdownEditor, "Markdown");
-  static const Raw = SettingsEditorType(Lk.settingsEditorsRawEditor, "Raw");
-  static const Journal =
-      SettingsEditorType(Lk.settingsEditorsJournalEditor, "Journal");
-  static const Checklist =
-      SettingsEditorType(Lk.settingsEditorsChecklistEditor, "Checklist");
-  static const Org = SettingsEditorType(Lk.settingsEditorsOrgEditor, "Org");
-  static const Default = Markdown;
-
-  const SettingsEditorType(super.lk, super.str);
-
-  static const options = <SettingsEditorType>[
-    Markdown,
-    Raw,
-    Journal,
-    Checklist,
-    Org,
-  ];
-
-  static SettingsEditorType fromInternalString(String? str) =>
-      GjSetting.fromInternalString(options, Default, str) as SettingsEditorType;
-
-  static SettingsEditorType fromPublicString(
-          BuildContext context, String str) =>
-      GjSetting.fromPublicString(context, options, Default, str)
-          as SettingsEditorType;
-
-  EditorType toEditorType() {
-    switch (this) {
-      case Markdown:
-        return EditorType.Markdown;
-      case Raw:
-        return EditorType.Raw;
-      case Journal:
-        return EditorType.Journal;
-      case Checklist:
-        return EditorType.Checklist;
-      case Org:
-        return EditorType.Org;
-      default:
-        assert(false, "Editor Type mismatch");
-        return EditorType.Markdown;
-    }
-  }
-
-  static SettingsEditorType fromEditorType(EditorType editorType) {
-    switch (editorType) {
-      case EditorType.Checklist:
-        return SettingsEditorType.Checklist;
-      case EditorType.Raw:
-        return SettingsEditorType.Raw;
-      case EditorType.Markdown:
-        return SettingsEditorType.Markdown;
-      case EditorType.Journal:
-        return SettingsEditorType.Journal;
-      case EditorType.Org:
-        return SettingsEditorType.Org;
-    }
-  }
 }
 
 class SettingsNoteFileFormat extends GjSetting {

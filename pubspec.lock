@@ -629,14 +629,6 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "2.0.35"
-  flutter_slidable:
-    dependency: transitive
-    description:
-      name: flutter_slidable
-      sha256: ea369262929d3cc6ebf9d8a00c196127966f117fe433a5e5cb47fb08008ca203
-      url: "https://pub.flutter-io.cn"
-    source: hosted
-    version: "4.0.3"
   flutter_staggered_grid_view:
     dependency: "direct main"
     description:
@@ -751,14 +743,6 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "0.1.0"
-  functional_zipper:
-    dependency: transitive
-    description:
-      name: functional_zipper
-      sha256: "1010a17991c1d1f9bffff65777abb34d39c5ce05bfe2203e18f395fc05296ad5"
-      url: "https://pub.flutter-io.cn"
-    source: hosted
-    version: "0.0.2"
   functions_client:
     dependency: transitive
     description:
@@ -855,14 +839,6 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "2.2.0"
-  highlighting:
-    dependency: transitive
-    description:
-      name: highlighting
-      sha256: "196005ed9c98ee559939fcecd466fa941b9e99b3a93394691b86780ad4da50f3"
-      url: "https://pub.flutter-io.cn"
-    source: hosted
-    version: "0.9.0+11.8.0"
   hive:
     dependency: "direct main"
     description:
@@ -1168,14 +1144,6 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "2.1.0"
-  more:
-    dependency: transitive
-    description:
-      name: more
-      sha256: e252628d2183cc09539b686abfbd9d8302675959b89a2a8146f5f4baca6ac5ba
-      url: "https://pub.flutter-io.cn"
-    source: hosted
-    version: "4.7.0"
   mutex:
     dependency: "direct main"
     description:
@@ -1225,22 +1193,6 @@ packages:
       url: "https://github.com/GitJournal/openssh_ed25519.git"
     source: git
     version: "1.1.1"
-  org_flutter:
-    dependency: "direct main"
-    description:
-      name: org_flutter
-      sha256: ce9b726ea3581b097bd83375b6855fd9c07cb65b7326d013271428f9092da320
-      url: "https://pub.flutter-io.cn"
-    source: hosted
-    version: "9.11.0"
-  org_parser:
-    dependency: transitive
-    description:
-      name: org_parser
-      sha256: b9d792f4115690405a52d9be1687d58a0c6e3883e9f83f1f49eb0e506cd30ae7
-      url: "https://pub.flutter-io.cn"
-    source: hosted
-    version: "9.11.0"
   overlord:
     dependency: transitive
     description:
@@ -1393,14 +1345,6 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "0.2.2"
-  petit_lisp:
-    dependency: transitive
-    description:
-      name: petit_lisp
-      sha256: "0b22a81fccba02bf96232cd746da90ce3c4c237c839b036c8b57e850af3c80de"
-      url: "https://pub.flutter-io.cn"
-    source: hosted
-    version: "6.5.0"
   petitparser:
     dependency: transitive
     description:

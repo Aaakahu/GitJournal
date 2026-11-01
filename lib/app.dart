@@ -11,7 +11,6 @@ import 'package:gitjournal/analytics/analytics.dart';
 import 'package:gitjournal/analytics/route_observer.dart';
 import 'package:gitjournal/app_router.dart';
 import 'package:gitjournal/change_notifiers.dart';
-import 'package:gitjournal/core/folder/notes_folder_config.dart';
 import 'package:gitjournal/core/link.dart';
 import 'package:gitjournal/core/views/note_links_view.dart';
 import 'package:gitjournal/error_reporting.dart';
@@ -146,16 +145,6 @@ class JournalAppState extends State<JournalApp> {
           localizedTitle: context.loc.actionsNewNote,
           icon: "ic_markdown",
         ),
-        ShortcutItem(
-          type: 'Checklist',
-          localizedTitle: context.loc.actionsNewChecklist,
-          icon: "ic_tasks",
-        ),
-        ShortcutItem(
-          type: 'Journal',
-          localizedTitle: context.loc.actionsNewJournal,
-          icon: "ic_book",
-        ),
       ]);
     });
 
@@ -177,9 +166,7 @@ class JournalAppState extends State<JournalApp> {
       return;
     }
 
-    var folderConfig = context.read<NotesFolderConfig>();
-    var editor = folderConfig.defaultEditor.toInternalString();
-    _navigatorKey.currentState!.pushNamed(AppRoute.NewNotePrefix + editor);
+    _navigatorKey.currentState!.pushNamed("${AppRoute.NewNotePrefix}Markdown");
   }
 
   @visibleForTesting

@@ -8,16 +8,12 @@ import 'package:flutter/foundation.dart' as foundation;
 import 'package:flutter/material.dart';
 import 'package:gitjournal/core/folder/notes_folder_fs.dart';
 import 'package:gitjournal/core/note_storage.dart';
-import 'package:gitjournal/core/notes/note.dart';
 import 'package:gitjournal/l10n.dart';
-import 'package:gitjournal/settings/settings.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:time/time.dart';
 
 import '../core/note.dart';
-import '../editors/common_types.dart';
 import '../logger/logger.dart';
 import '../repository.dart';
 
@@ -73,24 +69,6 @@ void showErrorSnackbar(BuildContext context, Object error) {
   showErrorMessageSnackbar(context, message);
 }
 
-NotesFolderFS getFolderForEditor(
-  Settings settings,
-  NotesFolderFS rootFolder,
-  EditorType editorType,
-) {
-  var spec = settings.defaultNewNoteFolderSpec;
-
-  switch (editorType) {
-    case EditorType.Journal:
-      spec = settings.journalEditordefaultNewNoteFolderSpec;
-      break;
-    default:
-      break;
-  }
-
-  return rootFolder.getFolderWithSpec(spec) ?? rootFolder;
-}
-
 Future<void> showAlertDialog(
     BuildContext context, String title, String message) async {
   var dialog = AlertDialog(
@@ -108,13 +86,4 @@ bool folderWithSpecExists(BuildContext context, String spec) {
 
 Future<void> shareNote(Note note) async {
   await Share.share(NoteStorage.serialize(note));
-}
-
-Future<Note?> getTodayJournalEntry(NotesFolderFS rootFolder) async {
-  var today = DateTime.now();
-  var matches = await rootFolder.matchNotes((n) async {
-    return n.type == NoteType.Journal && n.created.isAtSameDayAs(today);
-  });
-
-  return matches.isNotEmpty ? matches[0] : null;
 }
