@@ -2816,6 +2816,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Failed to Export'**
   String get failedToExport;
+
+  /// No description provided for @imageToggleSkippedSmall.
+  ///
+  /// In en, this message translates to:
+  /// **'Image is smaller than the thumbnail width - no size change to toggle'**
+  String get imageToggleSkippedSmall;
 }
 
 class _AppLocalizationsDelegate

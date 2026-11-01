@@ -424,6 +424,8 @@ class MarkdownEditorState extends State<MarkdownEditor>
   /// The mood picker (v1): any selection toggles the `#情绪` tag - the
   /// pipeline only tracks the tag's presence, never which mood was picked.
   void _showMoodPicker() {
+    // 收起键盘：避免弹层下半被 viewInsets 顶出可视区。
+    FocusManager.instance.primaryFocus?.unfocus();
     const moods = ['😊', '😐', '😟', '😫', '😡', '🤩'];
     showModalBottomSheet<void>(
       context: context,
@@ -467,6 +469,9 @@ class MarkdownEditorState extends State<MarkdownEditor>
   /// Toggles the standalone `#情绪` line at the top of the body. Not tracked
   /// by the undo stack - tagging a mood isn't undoable.
   void _toggleMoodTag() {
+    // 与图片宽度切换同源的问题：rich 模式下文档有 300ms 序列化去抖，
+    // 不先冲刷会用旧文本重建文档，丢最近输入并把光标弹回文首。
+    _richBodyEditorKey.currentState?.flushPendingWrite();
     var newText = toggleMoodTag(_textController.text);
     setState(() {
       _textController.value = TextEditingValue(

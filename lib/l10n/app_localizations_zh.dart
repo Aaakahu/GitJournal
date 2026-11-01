@@ -1422,6 +1422,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get failedToExport => '导出失败';
+
+  @override
+  String get imageToggleSkippedSmall => '图片小于缩略图宽度，无需切换显示大小';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -2842,6 +2845,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get failedToExport => '导出失败';
+
+  @override
+  String get imageToggleSkippedSmall => '图片小于缩略图宽度，无需切换显示大小';
 }
 
 /// The translations for Chinese, as used in Taiwan (`zh_TW`).

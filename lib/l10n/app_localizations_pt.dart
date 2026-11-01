@@ -1489,6 +1489,10 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get failedToExport => 'Failed to Export';
+
+  @override
+  String get imageToggleSkippedSmall =>
+      'Image is smaller than the thumbnail width - no size change to toggle';
 }
 
 /// The translations for Portuguese, as used in Brazil (`pt_BR`).

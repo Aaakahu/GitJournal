@@ -1492,4 +1492,8 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get failedToExport => 'Failed to Export';
+
+  @override
+  String get imageToggleSkippedSmall =>
+      'Image is smaller than the thumbnail width - no size change to toggle';
 }

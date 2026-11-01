@@ -916,15 +916,29 @@ class _GjImageComponentState extends State<GjImageComponent> {
       final isLongImage = _isLongImage;
 
       // The inner tap recognizer sits deeper in the tree than the document
-      // gesture system's, so it wins the arena.
+      // gesture system's, so it wins the arena. (opaque: BoxComponent 链不参与
+      // 命中测试，deferToChild 会让整个点击丢失。)
       return BoxComponent(
         key: widget.componentKey,
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: isLongImage
               ? () => _openFullScreen(context, provider)
-              : () =>
-                  GjImageScope.of(context).onImageWidthChange(widget.nodeId),
+              : () {
+                  // 上限语义：自然宽 ≤ 缩略图宽的图片，|240 切换没有视觉
+                  // 变化——跳过并提示，避免"点了没反应"的死按钮感。
+                  final natural = _decodedImage;
+                  if (natural != null && natural.width <= 240) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(context.loc.imageToggleSkippedSmall),
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                    return;
+                  }
+                  GjImageScope.of(context).onImageWidthChange(widget.nodeId);
+                },
           child: Align(
             alignment: AlignmentDirectional.centerStart,
             child: ConstrainedBox(
