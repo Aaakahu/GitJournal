@@ -20,7 +20,6 @@ class EditorBottomBar extends StatelessWidget {
   final Editor editor;
   final EditorState editorState;
   final NotesFolderFS parentFolder;
-  final bool allowEdits;
   final bool metaDataEditable;
 
   final bool undoAllowed;
@@ -37,7 +36,6 @@ class EditorBottomBar extends StatelessWidget {
     required this.editor,
     required this.editorState,
     required this.parentFolder,
-    required this.allowEdits,
     required this.metaDataEditable,
     required this.onUndoSelected,
     required this.onRedoSelected,
@@ -86,10 +84,7 @@ class EditorBottomBar extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            _Visibility(
-              visible: allowEdits,
-              child: addIcon,
-            ),
+            addIcon,
             const Spacer(),
             _Visibility(
               visible: undoAllowed,

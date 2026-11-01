@@ -5,23 +5,18 @@
  */
 
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:function_types/function_types.dart';
 import 'package:gitjournal/core/folder/notes_folder_fs.dart';
 import 'package:gitjournal/core/note.dart';
 import 'package:gitjournal/editors/bottom_bar.dart';
 import 'package:gitjournal/editors/common.dart';
 import 'package:gitjournal/editors/note_body_editor.dart';
-import 'package:gitjournal/settings/settings.dart';
-import 'package:gitjournal/widgets/note_viewer.dart';
-import 'package:provider/provider.dart';
 
 class EditorScaffold extends StatefulWidget {
   final Note startingNote;
   final Editor editor;
   final EditorState editorState;
   final bool noteModified;
-  final bool editMode;
   final List<Widget> extraActions;
   final Widget body;
   final NotesFolderFS parentFolder;
@@ -41,7 +36,6 @@ class EditorScaffold extends StatefulWidget {
     required this.editor,
     required this.editorState,
     required this.noteModified,
-    required this.editMode,
     required this.body,
     required this.parentFolder,
     required this.onUndoSelected,
@@ -58,7 +52,6 @@ class EditorScaffold extends StatefulWidget {
 }
 
 class _EditorScaffoldState extends State<EditorScaffold> {
-  var _editingMode = true;
   var _findMode = false;
 
   late Note note;
@@ -68,32 +61,7 @@ class _EditorScaffoldState extends State<EditorScaffold> {
     super.initState();
 
     note = widget.startingNote;
-
-    SchedulerBinding.instance
-        .addPostFrameCallback((_) => _initStateWithContext());
-  }
-
-  void _initStateWithContext() {
-    if (!mounted) return;
-
-    var settings = context.read<Settings>();
-
-    setState(() {
-      widget.editorState.addListener(_editorChanged);
-
-      if (settings.markdownDefaultView ==
-          SettingsMarkdownDefaultView.LastUsed) {
-        _editingMode =
-            settings.markdownLastUsedView == SettingsMarkdownDefaultView.Edit;
-      } else {
-        _editingMode =
-            settings.markdownDefaultView == SettingsMarkdownDefaultView.Edit;
-      }
-
-      if (widget.editMode) {
-        _editingMode = true;
-      }
-    });
+    widget.editorState.addListener(_editorChanged);
   }
 
   @override
@@ -107,24 +75,6 @@ class _EditorScaffoldState extends State<EditorScaffold> {
     note = widget.editorState.getNote();
   }
 
-  void _switchMode() {
-    var settings = context.read<Settings>();
-
-    setState(() {
-      _editingMode = !_editingMode;
-      switch (_editingMode) {
-        case true:
-          settings.markdownLastUsedView = SettingsMarkdownDefaultView.Edit;
-          break;
-        case false:
-          settings.markdownLastUsedView = SettingsMarkdownDefaultView.View;
-          break;
-      }
-      settings.save();
-      note = widget.editorState.getNote();
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     var responsiveBody = LayoutBuilder(builder: (context, constraints) {
@@ -132,9 +82,7 @@ class _EditorScaffoldState extends State<EditorScaffold> {
       var ch = textSize('0', NoteBodyEditor.textStyle(context));
       var maxWidth = ch.width * 65;
 
-      var body = _editingMode
-          ? widget.body
-          : NoteViewer(note: note, parentFolder: widget.parentFolder);
+      var body = widget.body;
 
       body = Scrollbar(child: body);
 
@@ -159,8 +107,6 @@ class _EditorScaffoldState extends State<EditorScaffold> {
               editorState: widget.editorState,
               noteModified: widget.noteModified,
               extraActions: widget.extraActions,
-              allowEdits: _editingMode,
-              onEditingModeChange: _switchMode,
             ),
           if (_findMode)
             EditorAppSearchBar(
@@ -179,7 +125,6 @@ class _EditorScaffoldState extends State<EditorScaffold> {
             editor: widget.editor,
             editorState: widget.editorState,
             parentFolder: widget.parentFolder,
-            allowEdits: _editingMode,
             metaDataEditable: note.canHaveMetadata,
             onUndoSelected: widget.onUndoSelected,
             onRedoSelected: widget.onRedoSelected,

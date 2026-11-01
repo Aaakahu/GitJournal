@@ -8,8 +8,6 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
-import 'package:function_types/function_types.dart';
-
 import 'package:gitjournal/core/note.dart';
 import 'search.dart';
 
@@ -72,16 +70,12 @@ class EditorAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   /// Extra actions shown at the start of the app bar actions.
   final List<Widget> extraActions;
-  final bool allowEdits;
-  final Func0<void> onEditingModeChange;
 
   const EditorAppBar({
     super.key,
     required this.editor,
     required this.editorState,
     required this.noteModified,
-    required this.allowEdits,
-    required this.onEditingModeChange,
     this.extraActions = const [],
   }) : preferredSize = const Size.fromHeight(kToolbarHeight);
 
@@ -100,12 +94,6 @@ class EditorAppBar extends StatelessWidget implements PreferredSizeWidget {
       ),
       actions: <Widget>[
         ...extraActions,
-        IconButton(
-          icon: allowEdits
-              ? const Icon(Icons.remove_red_eye)
-              : const Icon(Icons.edit),
-          onPressed: onEditingModeChange,
-        ),
         IconButton(
           icon: const Icon(Icons.delete),
           onPressed: () {

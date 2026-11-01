@@ -6,10 +6,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:gitjournal/l10n.dart';
-import 'package:gitjournal/settings/settings.dart';
 import 'package:gitjournal/settings/settings_storage.dart';
-import 'package:gitjournal/settings/widgets/settings_list_preference.dart';
-import 'package:provider/provider.dart';
 
 class SettingsEditorsScreen extends StatefulWidget {
   static const routePath = '/settings/editors';
@@ -21,24 +18,8 @@ class SettingsEditorsScreen extends StatefulWidget {
 class SettingsEditorsScreenState extends State<SettingsEditorsScreen> {
   @override
   Widget build(BuildContext context) {
-    var settings = context.watch<Settings>();
-
-    var body = ListView(children: <Widget>[
-      const DefaultFileFormatTile(),
-      ListPreference(
-        title: context.loc.settingsEditorsDefaultState,
-        currentOption: settings.markdownDefaultView.toPublicString(context),
-        options: SettingsMarkdownDefaultView.options
-            .map((f) => f.toPublicString(context))
-            .toList(),
-        onChange: (String publicStr) {
-          var val =
-              SettingsMarkdownDefaultView.fromPublicString(context, publicStr);
-          settings.markdownDefaultView = val;
-          settings.save();
-          setState(() {});
-        },
-      ),
+    var body = ListView(children: const <Widget>[
+      DefaultFileFormatTile(),
     ]);
 
     return Scaffold(

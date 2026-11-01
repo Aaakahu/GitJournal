@@ -306,10 +306,12 @@ class MarkdownEditorState extends State<MarkdownEditor>
       ),
     ];
     if (!_useRichEditor) {
+      // 源码 ↔ 实时预览 两态切换。rich 便签本身即所见即所得（无源码形态），
+      // 按钮只出现在回退到纯文本编辑器的便签上。
       extraActions.add(IconButton(
         tooltip: context.loc.editorLivePreview,
         icon: Icon(
-          Icons.vertical_split,
+          appConfig.livePreview ? Icons.code : Icons.visibility,
           color: appConfig.livePreview
               ? Theme.of(context).colorScheme.secondary
               : null,
@@ -326,7 +328,6 @@ class MarkdownEditorState extends State<MarkdownEditor>
       editor: widget,
       editorState: this,
       noteModified: _noteModified,
-      editMode: widget.editMode,
       parentFolder: _note.parent,
       body: editor,
       onUndoSelected: _undo,
