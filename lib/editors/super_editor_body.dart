@@ -377,16 +377,19 @@ class SuperEditorBodyState extends State<SuperEditorBody>
   // 末尾以下的空白是死区（点击落在 SuperEditor 自身渲染盒之外，原生手势层
   // 根本收不到事件）。兜底层由 SuperEditorTapFallback（裸 Listener，不进
   // 手势竞技场）在 pointer up 时调进来：只有"没命中任何内容、且点击位于
-  // 文档内容末尾之下"才认领，光标落到最末节点的后缘（图片后缘）。在那儿
-  // 打字时 super_editor 的 IME 层会自动在图片后新起段落承载文字
-  // （document_delta_editing._insertPlainText 对 UpstreamDownstreamNodePosition
-  // 光标先 InsertNewlineAtCaretRequest）。文档盒内部的块间空隙由原生手势层
-  // 的 nearest 语义处理，兜底层不掺和。
+  // 文档内容末尾之下"才认领。最末节点是图片时，其后缘
+  // （UpstreamDownstreamNodePosition）是不承载文字的块边界位置：光标绘制
+  // 几何继承图片块（居中/居左布局下视觉错位），打第一个字时 IME 层才补插
+  // 新段落把光标跳过去——中间态不该存在，这里直接在图片后插入空段落并
+  // 把光标落进去；之后再点，最末节点已是该空段落，走普通文本路径落
+  // endPosition，不会重复插入。文档盒内部的块间空隙由原生手势层的
+  // nearest 语义处理，兜底层不掺和。
   // ---------------------------------------------------------------------------
 
-  /// Claims a tap on the whitespace below the document content: moves the
-  /// collapsed caret to the end of the last node, focuses the editor and
-  /// raises the keyboard. Returns whether the tap was claimed.
+  /// Claims a tap on the whitespace below the document content: parks the
+  /// caret on a text position at the document end (inserting an empty
+  /// paragraph after a trailing image), focuses the editor and raises the
+  /// keyboard. Returns whether the tap was claimed.
   bool claimBlankTap(Offset globalPosition) {
     // 浮条/图片菜单打开期间，点击归它们（按钮、菜单外点击关闭）；不顺手
     // 挪光标——那会把正在应用的选区（如点加粗前）打没。
@@ -413,13 +416,32 @@ class SuperEditorBodyState extends State<SuperEditorBody>
       return false;
     }
 
-    _editor.execute([
-      ChangeSelectionRequest(
-        DocumentSelection.collapsed(position: nearest),
-        SelectionChangeType.placeCaret,
-        SelectionReason.userInteraction,
-      ),
-    ]);
+    if (lastNode is ImageNode) {
+      // 图片后缘不是文字位置：直接插入空段落承接光标，绝无"光标悬在图片
+      // 边缘"的中间态。与 _imageSelection 的互斥已在方法开头把关。
+      final below = _emptyParagraph();
+      _editor.execute([
+        InsertNodeAfterNodeRequest(existingNodeId: lastNode.id, newNode: below),
+        ChangeSelectionRequest(
+          DocumentSelection.collapsed(
+            position: DocumentPosition(
+              nodeId: below.id,
+              nodePosition: below.endPosition,
+            ),
+          ),
+          SelectionChangeType.insertContent,
+          SelectionReason.userInteraction,
+        ),
+      ]);
+    } else {
+      _editor.execute([
+        ChangeSelectionRequest(
+          DocumentSelection.collapsed(position: nearest),
+          SelectionChangeType.placeCaret,
+          SelectionReason.userInteraction,
+        ),
+      ]);
+    }
     _editorFocusNode.requestFocus();
     _showKeyboard();
     return true;

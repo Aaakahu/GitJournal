@@ -79,6 +79,37 @@ void main() {
           isTrue);
     });
 
+    test('trailing empty paragraph (blank-tap caret home) serializes to a '
+        'clean blank line', () {
+      final doc = deserializeGitJournalMarkdown('Hello\n\n![x](./a.jpg)');
+      // The node SuperEditorBodyState.claimBlankTap inserts below a trailing
+      // image to give the caret a text position to live in.
+      doc.insertNodeAt(
+        doc.nodeCount,
+        ParagraphNode(id: 'caret-home', text: AttributedText()),
+      );
+
+      final out = serializeGitJournalDocument(doc);
+
+      // The empty paragraph is a plain trailing blank line - no stray
+      // characters, no dangling markup.
+      expect(out, 'Hello\n\n![x](./a.jpg)\n\n');
+
+      // Reparsing drops the blank line (no stray node comes back) and a
+      // second pass converges to the canonical body, byte-stable.
+      final doc2 = deserializeGitJournalMarkdown(out);
+      expect(
+        doc2.toList().map((n) => n.runtimeType).toList(),
+        [ParagraphNode, ImageNode],
+      );
+      final out2 = serializeGitJournalDocument(doc2);
+      expect(out2, 'Hello\n\n![x](./a.jpg)');
+      expect(
+        serializeGitJournalDocument(deserializeGitJournalMarkdown(out2)),
+        out2,
+      );
+    });
+
     test('task list checked state is preserved', () {
       final doc =
           deserializeGitJournalMarkdown('- [ ] open\n- [x] done');

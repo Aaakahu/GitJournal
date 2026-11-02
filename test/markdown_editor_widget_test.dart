@@ -347,8 +347,8 @@ void main() {
     expect(downstreamEdge!.height, closeTo(16 * 1.45, 0.5));
   });
 
-  testWidgets('Tapping the blank space below a short note drops the caret '
-      'at the document end (image edge)', (tester) async {
+  testWidgets('Tapping the blank space below a trailing image inserts an '
+      'empty paragraph and parks the caret in it', (tester) async {
     var note = buildNote("Hello\n\n![x](./a.jpg)", title: "Img");
 
     var errors = await pumpEditor(tester, note);
@@ -361,25 +361,34 @@ void main() {
 
     // The test surface is much taller than this note's content: everything
     // below the trailing image is dead space for super_editor's native
-    // gesture layer. The fallback must park the caret on the image's
-    // trailing edge. (Tap point computed from the content edge; the screen
+    // gesture layer. (Tap point computed from the content edge; the screen
     // bottom is occupied by the editor's bottom bar.)
     final editorRect = tester.getRect(find.byType(GjImageComponent));
     await tester.tapAt(Offset(400, editorRect.bottom + 100));
     await tester.pump();
 
+    // The caret must never sit on the image's trailing edge
+    // (UpstreamDownstreamNodePosition): that block boundary position draws
+    // with the image block's geometry (dangling mid-image under centered /
+    // left layouts) and only jumps onto a fresh paragraph once the user
+    // types. The fallback inserts the paragraph right away instead.
+    final nodes = editor.document.toList();
+    expect(nodes.length, 3);
+    expect(nodes[0], isA<ParagraphNode>());
+    expect(nodes[1], isA<ImageNode>());
+    expect(nodes[1].id, imageId);
+    expect(nodes[2], isA<ParagraphNode>());
+    expect((nodes[2] as ParagraphNode).text.toPlainText(), isEmpty);
+
     final selection = editor.composer.selection;
     expect(selection, isNotNull);
     expect(selection!.isCollapsed, isTrue);
-    expect(selection.extent.nodeId, imageId);
-    expect(
-      selection.extent.nodePosition,
-      const UpstreamDownstreamNodePosition.downstream(),
-    );
+    expect(selection.extent.nodeId, nodes[2].id);
+    expect(selection.extent.nodePosition, isA<TextPosition>());
   });
 
-  testWidgets('Typing after a blank-space tap starts a fresh paragraph after '
-      'the trailing image', (tester) async {
+  testWidgets('Repeated blank-space taps below a trailing image do not '
+      'insert more paragraphs', (tester) async {
     var note = buildNote("Hello\n\n![x](./a.jpg)", title: "Img");
 
     var errors = await pumpEditor(tester, note);
@@ -392,11 +401,39 @@ void main() {
     await tester.tapAt(Offset(400, editorRect.bottom + 100));
     await tester.pump();
 
-    // The on-device IME path (document_delta_editing._insertPlainText) runs
-    // exactly these two steps for a caret sitting on an image edge: first a
-    // block newline (spawns a paragraph after the image), then the text.
-    editor.execute([InsertNewlineAtCaretRequest()]);
+    // The first tap inserted the empty paragraph, which is now the last
+    // node: a second tap on the same blank space must take the plain-text
+    // path (caret onto that paragraph), not insert another one.
+    await tester.tapAt(Offset(400, editorRect.bottom + 100));
     await tester.pump();
+
+    final nodes = editor.document.toList();
+    expect(nodes.length, 3);
+    expect(nodes.whereType<ImageNode>().length, 1);
+
+    final selection = editor.composer.selection;
+    expect(selection, isNotNull);
+    expect(selection!.extent.nodeId, nodes[2].id);
+    expect(selection.extent.nodePosition, isA<TextPosition>());
+  });
+
+  testWidgets('Typing after a blank-space tap lands directly in the empty '
+      'paragraph after the trailing image', (tester) async {
+    var note = buildNote("Hello\n\n![x](./a.jpg)", title: "Img");
+
+    var errors = await pumpEditor(tester, note);
+    expect(errors, isEmpty);
+
+    final superEditor = tester.widget<SuperEditor>(find.byType(SuperEditor));
+    final editor = superEditor.editor;
+
+    final editorRect = tester.getRect(find.byType(GjImageComponent));
+    await tester.tapAt(Offset(400, editorRect.bottom + 100));
+    await tester.pump();
+
+    // The caret already sits on a text position in the fresh paragraph: the
+    // on-device IME path (document_delta_editing._insertPlainText) inserts
+    // the text as-is — no InsertNewlineAtCaretRequest jump step anymore.
     editor.execute([
       InsertTextRequest(
         documentPosition: editor.composer.selection!.extent,
@@ -404,6 +441,7 @@ void main() {
         attributions: {},
       ),
     ]);
+    await tester.pump();
 
     // 图片后新起段落承载文字，图片节点仍在其前。
     final nodes = editor.document.toList();
